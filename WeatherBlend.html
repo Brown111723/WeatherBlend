@@ -86,6 +86,9 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .mname{font-weight:600;color:var(--text-primary);}.mdesc{font-size:10px;color:var(--text-muted);}
 .munavail{font-size:9px;color:#b45309;font-style:italic;}
 
+/* ── Legend ── */
+.legend{padding:6px 20px;display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-muted);border-bottom:1px solid var(--border);}
+.lsw{width:11px;height:7px;border-radius:2px;display:inline-block;vertical-align:middle;}
 
 /* ── Table ── */
 .table-wrap{overflow-x:auto;padding-bottom:40px;}
@@ -120,20 +123,16 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 .col-day{font-size:9px;color:var(--text-dim);display:block;margin-bottom:1px;}
 .col-time{display:block;}
-/* Section heading rows — double as avg data rows */
-.sec-head-temp td,.sec-head-wind td,.sec-head-rain td{
-  padding:8px 3px 6px;font-size:12px;font-weight:600;
-  border-bottom:2px solid var(--border2);text-align:center;color:var(--text-primary);
-}
+.sec-head-temp td,.sec-head-wind td,.sec-head-rain td{text-align:center;padding:8px 3px 6px;font-size:12px;font-weight:600;color:var(--text-primary);border-bottom:2px solid var(--border2);}
 .sec-head-temp td.row-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#86efac;text-align:left!important;padding-left:20px!important;}
 .sec-head-wind td.row-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#d9f99d;text-align:left!important;padding-left:20px!important;}
 .sec-head-rain td.row-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#90caf9;text-align:left!important;padding-left:20px!important;}
-.sec-head-temp .hilocell,.sec-head-wind .hilocell,.sec-head-rain .hilocell{font-size:9px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
+.sec-head-temp .hilocell,.sec-head-rain .hilocell,.sec-head-wind .hilocell{font-size:9px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
 .icon-row td{text-align:center;padding:8px 4px;font-size:19px;}
 .data-row td{text-align:center;padding:4px 3px;font-size:12px;color:var(--text-primary);min-width:54px;}
 .data-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;}
 .model-badge{display:inline-flex;align-items:center;gap:5px;}
-.avg-row td{text-align:center;padding:6px 3px;font-size:12px;font-weight:600;}
+.avg-row td{text-align:center;padding:6px 3px;font-size:12px;font-weight:600;border-top:2px solid var(--border2);}
 .avg-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--text-primary);}
 .hilocell{font-size:9px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
 .src-row.src-hidden{display:none;}
@@ -219,7 +218,13 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 <div class="model-panel" id="model-panel"></div>
 
+<div style="display:none" aria-hidden="true">
+  <span id="status-dot"></span>
+  <span id="status-text"></span>
+  <span id="model-pills"></span>
+</div>
 <div id="err-area"></div>
+
 
 
 <div class="table-wrap">
@@ -282,6 +287,10 @@ function buildSourcesPanel(){
       </div>`).join('');
 }
 
+function toggleSourcesPanel(){
+  document.getElementById('model-panel').classList.toggle('open');
+  document.getElementById('sources-btn').classList.toggle('active');
+}
 function toggleModel(key){
   if(autoHidden.has(key))return;
   const el=document.getElementById('toggle-'+key);
@@ -608,9 +617,10 @@ function setView(v,el){
 
 function renderSkeleton(){
   const sk='<span class="sk"></span>';const C=12;
-  document.getElementById('tbody').innerHTML=
-    `<tr class="hour-header"><th class="row-label"></th>${Array(C).fill(`<th>${sk}</th>`).join('')}</tr>`+
-    Array(8).fill(`<tr class="data-row"><td class="row-label">${sk}</td>${Array(C).fill(`<td>${sk}</td>`).join('')}</tr>`).join('');
+  document.querySelector('.ftable').innerHTML=
+    `<tbody><tr class="hour-header"><th class="row-label"></th>${Array(C).fill(`<th>${sk}</th>`).join('')}</tr>`+
+    Array(8).fill(`<tr class="data-row"><td class="row-label">${sk}</td>${Array(C).fill(`<td>${sk}</td>`).join('')}</tr>`).join('')+
+    `</tbody>`;
 }
 function renderTable(){if(state.view==='daily')renderDaily();else renderHourly();}
 
@@ -698,7 +708,7 @@ function renderHourly(){
     ${secGroup('wind',`
       <tr class="sec-head-wind"><td class="row-label">💨 Wind km/h</td>${avgWindCells}</tr>
       <tr class="data-row src-row"><td class="row-label" style="font-size:10px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
-    `)}\`;
+    `)}`;
 }
 
 // ══════════════════════════════════════════
@@ -764,8 +774,7 @@ function renderDaily(){
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('wind',`
-      <tr class="sec-head-wind"><td class="row-label">💨 Wind km/h (max)</td>${blanks}</tr>
-      <tr class="avg-row"><td class="row-label">⊕ Avg</td>${avgWindCells}</tr>
+      <tr class="sec-head-wind"><td class="row-label">💨 Wind km/h</td>${avgWindCells}</tr>
     `)}`;
 }
 
