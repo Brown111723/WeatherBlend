@@ -98,7 +98,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .table-wrap{overflow-x:auto;padding-bottom:40px;}
 .ftable{width:100%;border-collapse:separate;border-spacing:0;font-family:'JetBrains Mono',monospace;}
 .ftable th,.ftable td{white-space:nowrap;}
-.row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:145px;max-width:145px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
+.row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:98px;max-width:98px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
 .hour-header th.row-label{background:var(--bg);z-index:15;}
 .hour-header th{padding:12px 6px 8px;font-size:14px;font-weight:500;color:var(--text-muted);text-align:center;background:var(--bg);position:sticky;top:0;z-index:10;min-width:64px;border-bottom:2px solid var(--border);}
 .hour-header th.now-col{color:var(--accent);border-bottom-color:var(--accent);border-left:2px solid var(--accent)!important;}
@@ -202,7 +202,6 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
   <div class="hdr-right">
     <button class="loc-btn" onclick="promptLocation()">📍 <span class="loc-name" id="loc-name">Detecting…</span></button>
     <button class="hdr-btn" id="sources-hdr-btn" onclick="toggleSourcesPanel()" title="Config">⚙</button>
-    <button class="hdr-btn" onclick="fetchAllModels()" title="Refresh">↻</button>
     <button class="hdr-btn" onclick="showHelp()" title="Help">?</button>
   </div>
 </header>
@@ -1118,8 +1117,11 @@ function renderHourly(){
     const actTimes=actualData.hourly.time;
     const actVals=actualData.hourly[field]||[];
     const actMap={};actTimes.forEach((t,ai)=>{actMap[t]=ai;});
+    const nowMs=Date.now();
     return indices.map((hourIdx,ci)=>{
       const t=ref.time[hourIdx];
+      // Never show actuals for future timestamps
+      if(new Date(t).getTime()>=nowMs)return '<td class="empty">–</td>';
       const ai=actMap[t];
       if(ai===undefined)return '<td class="empty">–</td>';
       const v=actVals[ai];
@@ -1151,7 +1153,7 @@ function renderHourly(){
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('wind',`
-      <tr class="sec-head-wind"><td class="row-label">💨 Wind km/h</td>${avgWindCells}</tr>
+      <tr class="sec-head-wind"><td class="row-label">💨 Wind</td>${avgWindCells}</tr>
       <tr class="data-row src-row"><td class="row-label" style="font-size:13px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
     `)}`;
   scrollToNow();
@@ -1219,7 +1221,7 @@ function renderDaily(){
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('wind',`
-      <tr class="sec-head-wind"><td class="row-label">💨 Wind km/h</td>${avgWindCells}</tr>
+      <tr class="sec-head-wind"><td class="row-label">💨 Wind</td>${avgWindCells}</tr>
     `)}`;
 }
 
