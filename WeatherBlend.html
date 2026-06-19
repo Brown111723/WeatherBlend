@@ -798,8 +798,9 @@ function isDayStart(iso,prevIso){return prevIso&&iso.slice(0,10)!==prevIso.slice
 async function fetchActualsAndComputeWeights(){
   try{
     // Fetch ERA5 reanalysis actuals for past 7 days
-    const endDate=new Date(); endDate.setDate(endDate.getDate()-1);
-    const startDate=new Date(); startDate.setDate(startDate.getDate()-7);
+    // ERA5 reanalysis typically has a 2-5 day lag before data is available
+    const endDate=new Date(); endDate.setDate(endDate.getDate()-3);
+    const startDate=new Date(); startDate.setDate(startDate.getDate()-10);
     const fmt=d=>d.toISOString().slice(0,10);
 
     const url=`https://archive-api.open-meteo.com/v1/archive`
@@ -955,6 +956,19 @@ function setView(v,el){
   if(Object.keys(state.data).length)renderTable(); // instant table re-render
 }
 
+function scrollToNow(){
+  // Scroll the table so the 'now' column is near the left (with a little past context)
+  requestAnimationFrame(()=>{
+    const wrap=document.querySelector('.table-wrap');
+    const nowTh=document.querySelector('.hour-header th.now-col');
+    if(!wrap||!nowTh)return;
+    // Scroll so now column is ~2 columns from the left edge
+    const colW=nowTh.offsetWidth||64;
+    const offset=nowTh.offsetLeft - wrap.offsetLeft - colW*2;
+    wrap.scrollLeft=Math.max(0,offset);
+  });
+}
+
 function renderSkeleton(){
   const sk='<span class="sk"></span>';const C=12;
   document.querySelector('.ftable').innerHTML=
@@ -974,17 +988,17 @@ function renderHourly(){
   // Start from 7 days ago so past actual data is visible; scroll right for forecast
   const step=state.view==='1h'?1:state.view==='3h'?3:8;
   // Find index 7 days ago (or start of data)
-  const sevenDaysAgo=new Date(now.getTime()-7*24*3600*1000);
+  const sevenDaysAgo=new Date(now.getTime()-10*24*3600*1000);
   let si=ref.time.findIndex(t=>new Date(t)>=sevenDaysAgo);if(si<0)si=0;
   // Find "now" index for highlighting
   const nowIdx=ref.time.findIndex(t=>new Date(t)>=now);
   const raw=[];
-  for(let i=si;i<ref.time.length&&i<si+17*24;i+=step)raw.push(i);
-  const indices=raw.slice(0,state.view==='1h'?17*24:state.view==='3h'?Math.ceil(17*24/3):Math.ceil(17*24/8));
+  for(let i=si;i<ref.time.length&&i<si+20*24;i+=step)raw.push(i);
+  const indices=raw.slice(0,state.view==='1h'?20*24:state.view==='3h'?Math.ceil(20*24/3):Math.ceil(20*24/8));
 
   document.getElementById('date-info').innerHTML=
     `<strong>${now.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})}</strong>`+
-    ` · ${state.view==='1h'?'past 7 days + next 10 days':state.view==='3h'?'past 7 + next 10 days (3-hourly)':'past 7 + next 10 days (8-hourly)'} · scroll for forecast →`;
+    ` · ${state.view==='1h'?'past 10 days + next 10 days':state.view==='3h'?'past 10 + next 10 days (3-hourly)':'past 10 + next 10 days (8-hourly)'} · ◀ past &nbsp; now &nbsp; future ▶`;
 
   const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const ndCls=indices.map((i,ci)=>colDayCls(ref.time[i],ci>0?ref.time[indices[ci-1]]:null));
@@ -994,7 +1008,10 @@ function renderHourly(){
     const timeStr=fmtAmPm(d);  // am/pm
     const isNow=nowIdx>=0&&i===nowIdx;
     const cls=[isNow?'now-col':'',ndCls[ci]].filter(Boolean).join(' ');
-    return`<th class="${cls}"><span class="col-day">${DAYS[d.getDay()]}</span><span class="col-time">${timeStr}</span></th>`;
+    const dateNum=d.getDate();
+    const showDate=ci===0||d.getHours()===0||(step>=8&&ci%1===0); // show date on midnight or first col
+    const dayLabel=`${DAYS[d.getDay()]}${showDate?' '+dateNum:''}`;
+    return`<th class="${cls}"><span class="col-day">${dayLabel}</span><span class="col-time">${timeStr}</span></th>`;
   }).join('');
 
   const allActive=activeAll();const onlyEnabled=activeEnabled();
@@ -1076,6 +1093,7 @@ function renderHourly(){
       <tr class="sec-head-wind"><td class="row-label">💨 Wind km/h</td>${avgWindCells}</tr>
       <tr class="data-row src-row"><td class="row-label" style="font-size:13px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
     `)}`;
+  scrollToNow();
 }
 
 // ══════════════════════════════════════════
