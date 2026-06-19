@@ -1040,7 +1040,12 @@ function renderHourly(){
     const dateNum=d.getDate();
     const showDate=ci===0||d.getHours()===0||(step>=8&&ci%1===0); // show date on midnight or first col
     const dayLabel=`${DAYS[d.getDay()]}${showDate?' '+dateNum:''}`;
-    return`<th class="${cls}"><span class="col-day">${dayLabel}</span><span class="col-time">${timeStr}</span></th>`;
+    let thCell=`<th class="${cls}"><span class="col-day">${dayLabel}</span><span class="col-time">${timeStr}</span></th>`;
+    if(showTotals&&insertAfter.has(i)){
+      const d2=new Date(ref.time[i].slice(0,10)+'T12:00:00');
+      thCell+=`<th class="total-col" style="min-width:52px;font-size:11px;color:var(--text-dim);padding:6px 3px;position:sticky;top:0;background:var(--surface2)">Σ ${d2.getDate()}</th>`;
+    }
+    return thCell;
   }).join('');
 
   const allActive=activeAll();const onlyEnabled=activeEnabled();
@@ -1058,7 +1063,12 @@ function renderHourly(){
     const cls=v!=null?tempCls(v):'';
     const hl=hiloKey?dailyHiLo(hiloKey,ref.time[indices[ci]]):null;
     const hlHtml=hl&&hl.hi!=null?`<span class="hilocell">↑${hl.hi.toFixed(0)}° ↓${hl.lo!=null?hl.lo.toFixed(0)+'°':'—'}</span>`:'';
-    return injectColCls(`<td class="${cls}">${fmt(v,0)}°${hlHtml}</td>`,ndCls[ci]);
+    let tc=injectColCls(`<td class="${cls}">${fmt(v,0)}°${hlHtml}</td>`,ndCls[ci]);
+    if(showTotals&&insertAfter.has(indices[ci])){
+      const t=totalsMap[ref.time[indices[ci]].slice(0,10)];
+      tc+=`<td class="total-col" style="font-size:11px">${t&&t.hi!=null?`↑${t.hi.toFixed(0)}° ↓${t.lo!=null?t.lo.toFixed(0)+'°':'–'}`:'–'}</td>`;
+    }
+    return tc;
   }).join('');
 
   // ── WIND ──
@@ -1074,7 +1084,15 @@ function renderHourly(){
     return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}${(()=>{const w=modelWeights[m.key];if(!w)return '';const pct=Math.round(w*100);const cls=pct>=20?'high':pct>=10?'mid':'low';return '<span class="weight-badge '+cls+'">'+pct+'%</span>';})()}</span></span></td>${cells}</tr>`;
   }).join('');
   const avgRain=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,'precipitation',indices)[ci]}))));
-  const avgRainCells=avgRain.map((v,ci)=>{const cls=rainCls(v);const txt=v==null?'—':v<0.05?'<span class="empty">0</span>':v.toFixed(1);return injectColCls(`<td class="${cls}">${txt}</td>`,ndCls[ci]);}).join('');
+  const avgRainCells=avgRain.map((v,ci)=>{const cls=rainCls(v);const txt=v==null?'—':v<0.05?'<span class="empty">0</span>':v.toFixed(1);
+    let rc=injectColCls(`<td class="${cls}">${txt}</td>`,ndCls[ci]);
+    if(showTotals&&insertAfter.has(indices[ci])){
+      const t=totalsMap[ref.time[indices[ci]].slice(0,10)];
+      const tCls=t?rainCls(t.rain/24):'';
+      rc+=`<td class="total-col ${tCls}">${t?t.rain.toFixed(1)+'mm':'–'}</td>`;
+    }
+    return rc;
+  }).join('');
 
   const iconKey=onlyEnabled[0]?.key||allActive[0]?.key;
   const iconCells=hVals(iconKey,'weathercode',indices).map((c,ci)=>injectColCls(`<td>${wxIcon(c)}</td>`,ndCls[ci])).join('');
