@@ -382,11 +382,38 @@ function updateAutoLabel(){
 // ══════════════════════════════════════════
 function getLocation(){
   setStatus('spin','Detecting location…');
-  if(!navigator.geolocation){useDefault();return;}
+  if(!navigator.geolocation){
+    geoFailed('Geolocation not supported by this browser.');
+    return;
+  }
+  // Use a manual timeout as backup — getCurrentPosition can hang silently
+  const geoTimer = setTimeout(()=>geoFailed('Location timed out.'), 8000);
   navigator.geolocation.getCurrentPosition(
-    pos=>{state.lat=pos.coords.latitude;state.lon=pos.coords.longitude;reverseGeocode(state.lat,state.lon);fetchAllModels();},
-    ()=>useDefault()
+    pos=>{
+      clearTimeout(geoTimer);
+      state.lat=pos.coords.latitude;
+      state.lon=pos.coords.longitude;
+      reverseGeocode(state.lat,state.lon);
+      fetchAllModels();
+    },
+    err=>{
+      clearTimeout(geoTimer);
+      // err.code: 1=PERMISSION_DENIED, 2=UNAVAILABLE, 3=TIMEOUT
+      const msg = err.code===1
+        ? 'Location access denied — click 📍 to enter your city manually.'
+        : 'Could not detect location — click 📍 to enter your city.';
+      geoFailed(msg);
+    },
+    {timeout:7000, maximumAge:300000, enableHighAccuracy:false}
   );
+}
+
+function geoFailed(reason){
+  // Fall back to London but show a friendly notice so user knows to set city
+  state.lat=51.5074; state.lon=-0.1278;
+  document.getElementById('loc-name').textContent='Set your city →';
+  setStatus('ok', reason);
+  fetchAllModels();
 }
 function useDefault(){
   state.lat=51.5074;state.lon=-0.1278;
