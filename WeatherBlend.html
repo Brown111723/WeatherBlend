@@ -9,50 +9,54 @@
 :root{
   --bg:#0e1117;--surface:#161b24;--surface2:#1a2030;
   --border:#1f2733;--border2:#263040;
-  --text-primary:#e8edf5;--text-muted:#6b7a92;--text-dim:#3d4d60;
+  --text-primary:#f4f7fd;--text-muted:#9aafc8;--text-dim:#607080;
   --accent:#3b82f6;
   /* Night shading: DAY columns are slightly lighter, NIGHT columns are the base dark bg */
   --day-bg:color-mix(in srgb,var(--bg) 78%,#1a2a10 22%);
   --day-line:rgba(255,200,50,0.28);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text-primary);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;}
+body{background:var(--bg);color:var(--text-primary);font-family:'Inter',sans-serif;font-size:18px;min-height:100vh;}
 
 /* ── Header ── */
 header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:100;}
-.logo{font-size:17px;font-weight:700;letter-spacing:-.3px;}
+.logo{font-size:22px;font-weight:700;letter-spacing:-.3px;}
 .logo span{color:var(--accent);}
-.loc-btn{display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--border);border-radius:16px;font-size:12px;color:var(--text-muted);cursor:pointer;border:none;transition:background .15s;}
+.loc-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;background:var(--border);border-radius:16px;font-size:15px;color:var(--text-muted);cursor:pointer;border:none;transition:background .15s;}
 .loc-btn:hover{background:var(--border2);}
 .loc-name{color:var(--text-primary);font-weight:500;}
+.hdr-btn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;transition:all .15s;flex-shrink:0;}
+.hdr-btn:hover{background:var(--border2);color:var(--text-primary);}
+.hdr-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.hdr-right{display:flex;align-items:center;gap:8px;}
 
 /* ── Current conditions bar ── */
 #curr-bar{padding:10px 20px;border-bottom:1px solid var(--border);background:var(--surface2);display:none;align-items:center;gap:14px;flex-wrap:wrap;}
 #curr-bar.loaded{display:flex;}
-.curr-icon{font-size:30px;line-height:1;}
+.curr-icon{font-size:40px;line-height:1;}
 .curr-temp-block{display:flex;flex-direction:column;gap:1px;}
-.curr-temp{font-size:28px;font-weight:700;letter-spacing:-1px;color:var(--text-primary);}
-.curr-hilo{font-size:10px;color:var(--text-muted);margin-top:1px;}
+.curr-temp{font-size:36px;font-weight:700;letter-spacing:-1px;color:var(--text-primary);}
+.curr-hilo{font-size:13px;color:var(--text-muted);margin-top:1px;}
 .curr-meta{display:flex;flex-direction:column;gap:2px;}
-.curr-line{font-size:11px;color:var(--text-muted);}
+.curr-line{font-size:14px;color:var(--text-muted);}
 .curr-line strong{color:var(--text-primary);}
-.curr-synopsis{font-size:11px;color:var(--text-muted);font-style:italic;max-width:240px;line-height:1.4;}
+.curr-synopsis{font-size:14px;color:var(--text-muted);font-style:italic;max-width:240px;line-height:1.4;}
 .curr-divider{width:1px;height:38px;background:var(--border);flex-shrink:0;}
 .curr-block{display:flex;flex-direction:column;gap:2px;}
-.curr-lbl{font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.8px;}
-.curr-val{font-size:13px;font-weight:600;color:var(--text-primary);}
-.curr-sub{font-size:10px;color:var(--text-muted);}
+.curr-lbl{font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.8px;}
+.curr-val{font-size:16px;font-weight:600;color:var(--text-primary);}
+.curr-sub{font-size:13px;color:var(--text-muted);}
 
 /* ── Toolbar ── */
 .toolbar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:var(--surface);}
-.date-info{font-size:12px;color:var(--text-muted);flex:1;min-width:150px;}
+.date-info{font-size:15px;color:var(--text-muted);flex:1;min-width:150px;}
 .date-info strong{color:var(--text-primary);}
 .btn-group{display:flex;gap:3px;}
-.btn{padding:5px 10px;border-radius:10px;font-size:12px;font-weight:500;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn{padding:7px 13px;border-radius:10px;font-size:15px;font-weight:500;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;}
 .btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
 .btn:hover:not(.active){border-color:var(--border2);color:var(--text-primary);}
 /* Section toggles — coloured when on */
-.sec-toggle{padding:4px 9px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.sec-toggle{padding:6px 11px;border-radius:8px;font-size:14px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;}
 .sec-toggle.on{color:var(--text-primary);background:var(--surface2);border-color:var(--border2);}
 .sec-toggle.off{opacity:.4;}
 .sec-toggle:hover{opacity:1;border-color:var(--border2);}
@@ -60,7 +64,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .sec-toggle[data-sec="temp"].on{border-color:#86efac;color:#86efac;}
 .sec-toggle[data-sec="wind"].on{border-color:#d9f99d;color:#d9f99d;}
 .sec-toggle[data-sec="rain"].on{border-color:#90caf9;color:#90caf9;}
-.refresh-badge{font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:4px;margin-left:2px;}
+.refresh-badge{font-size:13px;color:var(--text-dim);display:flex;align-items:center;gap:4px;margin-left:2px;}
 .refresh-badge .tick{width:5px;height:5px;border-radius:50%;background:#22c55e;animation:rpulse 2s infinite;}
 @keyframes rpulse{0%,100%{opacity:1}50%{opacity:.3}}
 
@@ -70,21 +74,21 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .dot.spin{background:#f59e0b;animation:dpulse 1s infinite;}
 .dot.err{background:#ef4444;}
 @keyframes dpulse{0%,100%{opacity:1}50%{opacity:.3}}
-.mpill{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;}
+.mpill{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:8px;font-size:13px;font-weight:600;}
 .mpill.ok{background:#0d2a1a;color:#4ade80;}.mpill.fail{background:#2a0d0d;color:#f87171;}.mpill.load{background:#1a1a0d;color:#fbbf24;}
 
 /* ── Sources panel ── */
 .model-panel{padding:10px 20px 12px;border-bottom:1px solid var(--border);background:var(--surface2);display:none;flex-wrap:wrap;gap:8px;align-items:center;}
 .model-panel.open{display:flex;}
-.panel-label{font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:1px;text-transform:uppercase;}
-.model-toggle{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:9px;border:1px solid var(--border);cursor:pointer;transition:all .15s;user-select:none;font-size:11px;}
+.panel-label{font-size:13px;color:var(--text-dim);font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.model-toggle{display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:9px;border:1px solid var(--border);cursor:pointer;transition:all .15s;user-select:none;font-size:14px;}
 .model-toggle.enabled{border-color:var(--border2);background:var(--surface);}
 .model-toggle.disabled{border-color:var(--border);opacity:.4;}
 .model-toggle.unavail{border-color:#3a1a0a;opacity:.5;cursor:default;}
 .model-toggle:hover:not(.unavail){opacity:1;border-color:var(--border2);}
-.mdot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0;}
-.mname{font-weight:600;color:var(--text-primary);}.mdesc{font-size:10px;color:var(--text-muted);}
-.munavail{font-size:9px;color:#b45309;font-style:italic;}
+.mdot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;}
+.mname{font-weight:600;color:var(--text-primary);}.mdesc{font-size:13px;color:var(--text-muted);}
+.munavail{font-size:12px;color:#b45309;font-style:italic;}
 
 /* ── Legend ── */
 .legend{padding:6px 20px;display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-muted);border-bottom:1px solid var(--border);}
@@ -94,9 +98,9 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .table-wrap{overflow-x:auto;padding-bottom:40px;}
 .ftable{width:100%;border-collapse:separate;border-spacing:0;font-family:'JetBrains Mono',monospace;}
 .ftable th,.ftable td{white-space:nowrap;}
-.row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:122px;max-width:122px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
+.row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:145px;max-width:145px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
 .hour-header th.row-label{background:var(--bg);z-index:15;}
-.hour-header th{padding:10px 4px 6px;font-size:11px;font-weight:500;color:var(--text-muted);text-align:center;background:var(--bg);position:sticky;top:0;z-index:10;min-width:54px;border-bottom:2px solid var(--border);}
+.hour-header th{padding:12px 6px 8px;font-size:14px;font-weight:500;color:var(--text-muted);text-align:center;background:var(--bg);position:sticky;top:0;z-index:10;min-width:64px;border-bottom:2px solid var(--border);}
 .hour-header th.now-col{color:var(--accent);border-bottom-color:var(--accent);}
 
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
@@ -121,24 +125,24 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .day-col.wh{background:color-mix(in srgb,#3a2a0a 80%,#1a2a10 20%)!important;}
 .day-col.wx{background:color-mix(in srgb,#4a1a0a 80%,#1a2a10 20%)!important;}
 
-.col-day{font-size:9px;color:var(--text-dim);display:block;margin-bottom:1px;}
+.col-day{font-size:12px;color:var(--text-dim);display:block;margin-bottom:1px;}
 .col-time{display:block;}
-.sec-head-temp td,.sec-head-wind td,.sec-head-rain td{text-align:center;padding:8px 3px 6px;font-size:12px;font-weight:600;color:var(--text-primary);border-bottom:2px solid var(--border2);}
-.sec-head-temp td.row-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#86efac;text-align:left!important;padding-left:20px!important;}
-.sec-head-wind td.row-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#d9f99d;text-align:left!important;padding-left:20px!important;}
-.sec-head-rain td.row-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#90caf9;text-align:left!important;padding-left:20px!important;}
-.sec-head-temp .hilocell,.sec-head-rain .hilocell,.sec-head-wind .hilocell{font-size:9px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
-.icon-row td{text-align:center;padding:8px 4px;font-size:19px;}
-.data-row td{text-align:center;padding:4px 3px;font-size:12px;color:var(--text-primary);min-width:54px;}
-.data-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;}
+.sec-head-temp td,.sec-head-wind td,.sec-head-rain td{text-align:center;padding:10px 4px 8px;font-size:15px;font-weight:600;color:var(--text-primary);border-bottom:2px solid var(--border2);}
+.sec-head-temp td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#86efac;text-align:left!important;padding-left:20px!important;}
+.sec-head-wind td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#d9f99d;text-align:left!important;padding-left:20px!important;}
+.sec-head-rain td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#90caf9;text-align:left!important;padding-left:20px!important;}
+.sec-head-temp .hilocell,.sec-head-rain .hilocell,.sec-head-wind .hilocell{font-size:12px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
+.icon-row td{text-align:center;padding:10px 5px;font-size:24px;}
+.data-row td{text-align:center;padding:6px 4px;font-size:15px;color:var(--text-primary);min-width:54px;}
+.data-row td.row-label{font-family:'Inter',sans-serif;font-size:14px;}
 .model-badge{display:inline-flex;align-items:center;gap:5px;}
 .avg-row td{text-align:center;padding:6px 3px;font-size:12px;font-weight:600;border-top:2px solid var(--border2);}
 .avg-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--text-primary);}
-.hilocell{font-size:9px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
+.hilocell{font-size:12px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
 .src-row.src-hidden{display:none;}
 .section-group.sec-off{display:none;}
 .spacer td{height:5px;}
-.empty{color:var(--text-dim)!important;font-size:10px;}
+.empty{color:var(--text-dim)!important;font-size:13px;}
 
 /* Rain */
 .r0{color:var(--text-dim)!important;}.r1{background:#0d2540;color:#7bb8f0!important;}.r2{background:#0d3a5c;color:#90caf9!important;}.r3{background:#0f4c8a;color:#bbdefb!important;}.r4{background:#1565c0;color:#e3f2fd!important;}.r5{background:#1976d2;color:#fff!important;}.r6{background:#0d47a1;color:#fff!important;font-weight:700;}
@@ -147,11 +151,38 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 /* Temp */
 .tc{background:#0d1a2e;color:#93c5fd!important;}.tk{background:#0d2040;color:#bfdbfe!important;}.tm{background:#0d2e1a;color:#86efac!important;}.tw{background:#2e2000;color:#fcd34d!important;}.th{background:#3a1000;color:#fca5a5!important;}
 
-.dir-cell{font-size:10px;color:var(--text-muted)!important;}
+.dir-cell{font-size:13px;color:var(--text-muted)!important;}
 .sk{display:inline-block;border-radius:3px;height:12px;width:28px;background:linear-gradient(90deg,var(--border) 25%,#263040 50%,var(--border) 75%);background-size:200% 100%;animation:shim 1.2s infinite;}
 @keyframes shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.err-banner{margin:10px 20px;padding:10px 14px;background:#2a1010;border:1px solid #5a1a1a;border-radius:8px;color:#f87171;font-size:12px;}
-.source-note{padding:12px 20px;font-size:10px;color:var(--text-dim);}
+.city-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.city-overlay.hidden{display:none;}
+.city-modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:400px;width:100%;display:flex;flex-direction:column;gap:14px;}
+.city-modal h3{font-size:18px;font-weight:700;color:var(--text-primary);}
+.city-modal p{font-size:14px;color:var(--text-muted);line-height:1.5;}
+.city-input{width:100%;padding:12px 16px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;color:var(--text-primary);font-size:16px;outline:none;}
+.city-input:focus{border-color:var(--accent);}
+.city-btn{padding:12px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:none;transition:background .15s;}
+.city-btn-primary{background:var(--accent);color:#fff;}
+.city-btn-primary:hover{background:#2563eb;}
+.city-btn-gps{background:var(--border2);color:var(--text-primary);}
+.city-btn-gps:hover{background:var(--border);}
+.help-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.help-overlay.hidden{display:none;}
+.help-modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;max-width:540px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;}
+.help-modal h2{font-size:20px;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+.help-modal .help-sub{font-size:13px;color:var(--text-muted);margin-bottom:20px;}
+.help-modal h3{font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--accent);margin:18px 0 8px;}
+.help-modal p{font-size:14px;color:var(--text-muted);line-height:1.6;margin-bottom:6px;}
+.help-modal .src-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;}
+.help-modal .src-item{background:var(--surface2);border-radius:8px;padding:7px 10px;}
+.help-modal .src-name{font-size:13px;font-weight:700;color:var(--text-primary);}
+.help-modal .src-desc{font-size:11px;color:var(--text-muted);}
+.help-modal .swatch-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+.help-modal .swatch{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);}
+.help-modal .sw{width:22px;height:14px;border-radius:3px;display:inline-block;}
+.help-close{position:sticky;bottom:0;width:100%;margin-top:20px;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;}
+.err-banner{margin:10px 20px;padding:12px 16px;background:#2a1010;border:1px solid #5a1a1a;border-radius:8px;color:#f87171;font-size:15px;}
+.source-note{padding:14px 20px;font-size:13px;color:var(--text-dim);}
 .source-note a{color:var(--text-muted);text-decoration:none;}
 </style>
 </head>
@@ -159,7 +190,12 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 <header>
   <div class="logo">Weather<span>Blend</span></div>
-  <button class="loc-btn" onclick="promptLocation()">📍 <span class="loc-name" id="loc-name">Detecting…</span></button>
+  <div class="hdr-right">
+    <button class="loc-btn" onclick="promptLocation()">📍 <span class="loc-name" id="loc-name">Detecting…</span></button>
+    <button class="hdr-btn" id="sources-hdr-btn" onclick="toggleSourcesPanel()" title="Config">⚙</button>
+    <button class="hdr-btn" onclick="fetchAllModels()" title="Refresh">↻</button>
+    <button class="hdr-btn" onclick="showHelp()" title="Help">?</button>
+  </div>
 </header>
 
 <!-- Current conditions bar -->
@@ -175,6 +211,11 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
     <div class="curr-synopsis" id="curr-synopsis"></div>
   </div>
   <div class="curr-divider"></div>
+  <div class="curr-block">
+    <div class="curr-lbl">Rain today</div>
+    <div class="curr-val" id="curr-today-rain">–</div>
+    <div class="curr-sub" id="curr-today-sub">–</div>
+  </div>
   <div class="curr-block">
     <div class="curr-lbl" id="curr-past-lbl">Rain past 1hr</div>
     <div class="curr-val" id="curr-past-rain">–</div>
@@ -202,21 +243,89 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
     <button class="btn" onclick="setView('8h',this)">8hr</button>
     <button class="btn" onclick="setView('daily',this)">Daily</button>
   </div>
-  <!-- Section toggles (between timeframe and sources) -->
-  <div class="btn-group">
-    <button class="sec-toggle on"  data-sec="temp" id="tog-temp" onclick="toggleSection('temp',this)">🌡 Temp</button>
-    <button class="sec-toggle on"  data-sec="rain" id="tog-rain" onclick="toggleSection('rain',this)">🌧 Rain</button>
-    <button class="sec-toggle off" data-sec="wind" id="tog-wind" onclick="toggleSection('wind',this)">💨 Wind</button>
-  </div>
-  <button class="btn" id="detail-btn" onclick="toggleDetail()" style="padding:5px 9px;font-size:11px;">👁 Sources</button>
-  <div class="btn-group">
-    <button class="btn" id="sources-btn" onclick="toggleSourcesPanel()" style="padding:5px 9px;font-size:11px;">⚙ Config</button>
-    <button class="btn" onclick="fetchAllModels()" style="padding:5px 9px;font-size:11px;">↻</button>
-  </div>
-  <div class="refresh-badge"><span class="tick"></span><span id="auto-label">auto</span></div>
+
 </div>
 
 <div class="model-panel" id="model-panel"></div>
+
+<!-- City prompt modal -->
+<div class="city-overlay hidden" id="city-overlay">
+  <div class="city-modal">
+    <h3>📍 Set Your Location</h3>
+    <p id="city-prompt-msg">Enter your city for accurate local weather.</p>
+    <input class="city-input" id="city-input" type="text" placeholder="e.g. Dubbo, NSW"
+      onkeydown="if(event.key==='Enter')submitCity()">
+    <button class="city-btn city-btn-primary" onclick="submitCity()">Search</button>
+    <button class="city-btn city-btn-gps" onclick="tryGPS()">📡 Try GPS instead</button>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div class="help-overlay hidden" id="help-overlay" onclick="hideHelp(event)">
+  <div class="help-modal">
+    <h2>WeatherBlend</h2>
+    <div class="help-sub">Multi-model weather forecast · All data free, no API key required</div>
+
+    <h3>What is it?</h3>
+    <p>WeatherBlend fetches forecasts from multiple global weather models simultaneously and averages them together. Research shows multi-model averages are consistently more accurate than any single model.</p>
+
+    <h3>Timeframes</h3>
+    <p><strong>1hr</strong> — next 48 hours, one column per hour.<br>
+    <strong>3hr</strong> — next 8 days, one column every 3 hours.<br>
+    <strong>8hr</strong> — next 10 days, one column every 8 hours.<br>
+    <strong>Daily</strong> — 10-day summary with max/min temp, total rain, max wind.</p>
+
+    <h3>Reading the table</h3>
+    <p>Each section heading row <em>is</em> the average. Open ⚙ Config and enable Sources to see individual model rows below it. Columns shaded slightly lighter are daytime hours. A vertical amber line marks the start of each new day.</p>
+
+    <h3>Colour coding</h3>
+    <p><strong style="color:#86efac">Temperature</strong></p>
+    <div class="swatch-row">
+      <div class="swatch"><span class="sw" style="background:#0d1a2e"></span> &lt;5° Cold</div>
+      <div class="swatch"><span class="sw" style="background:#0d2040"></span> 5–12° Cool</div>
+      <div class="swatch"><span class="sw" style="background:#0d2e1a"></span> 12–22° Mild</div>
+      <div class="swatch"><span class="sw" style="background:#2e2000"></span> 22–30° Warm</div>
+      <div class="swatch"><span class="sw" style="background:#3a1000"></span> &gt;30° Hot</div>
+    </div>
+    <p style="margin-top:10px"><strong style="color:#90caf9">Rain</strong></p>
+    <div class="swatch-row">
+      <div class="swatch"><span class="sw" style="background:#0d2540"></span> Trace</div>
+      <div class="swatch"><span class="sw" style="background:#0f4c8a"></span> 0.5mm/hr</div>
+      <div class="swatch"><span class="sw" style="background:#1976d2"></span> 1mm/hr</div>
+      <div class="swatch"><span class="sw" style="background:#0d47a1"></span> 5mm/hr+</div>
+    </div>
+    <p style="margin-top:10px"><strong style="color:#d9f99d">Wind</strong></p>
+    <div class="swatch-row">
+      <div class="swatch"><span class="sw" style="background:#0a1a0f"></span> Calm &lt;10</div>
+      <div class="swatch"><span class="sw" style="background:#0d2215"></span> Light 10–20</div>
+      <div class="swatch"><span class="sw" style="background:#2a3a0a"></span> Moderate 20–35</div>
+      <div class="swatch"><span class="sw" style="background:#3a2a0a"></span> Strong 35–55</div>
+      <div class="swatch"><span class="sw" style="background:#4a1a0a"></span> Storm 55+</div>
+    </div>
+
+    <h3>Weather sources (9 models)</h3>
+    <div class="src-grid">
+      <div class="src-item"><div class="src-name" style="color:#2563eb">GFS</div><div class="src-desc">NOAA · USA · Global 25km · 16-day</div></div>
+      <div class="src-item"><div class="src-name" style="color:#059669">ECMWF</div><div class="src-desc">European Centre · 9km · Open data since Oct 2025</div></div>
+      <div class="src-item"><div class="src-name" style="color:#16a34a">ICON</div><div class="src-desc">DWD · Germany · Global + Europe high-res</div></div>
+      <div class="src-item"><div class="src-name" style="color:#7c3aed">GEM</div><div class="src-desc">Environment Canada · Global 10km</div></div>
+      <div class="src-item"><div class="src-name" style="color:#b45309">BOM</div><div class="src-desc">Bureau of Meteorology · Australia ACCESS-G · may be temporarily unavailable</div></div>
+      <div class="src-item"><div class="src-name" style="color:#dc2626">UKMO</div><div class="src-desc">UK Met Office · Global model</div></div>
+      <div class="src-item"><div class="src-name" style="color:#d97706">CMA</div><div class="src-desc">China Met Admin · GRAPES global</div></div>
+      <div class="src-item"><div class="src-name" style="color:#6366f1">JMA</div><div class="src-desc">Japan Met Agency · Global 20km</div></div>
+    </div>
+    <p style="margin-top:10px;font-size:12px">All data via <a href="https://open-meteo.com" target="_blank" style="color:var(--accent)">Open-Meteo</a>. No API key needed. Refreshes automatically every hour.</p>
+
+    <h3>Location</h3>
+    <p>WeatherBlend tries browser GPS first. If denied, it falls back to IP-based location which may show your ISP city. Tap 📍 and type your city name for accurate location.</p>
+
+    <h3>Config panel (⚙)</h3>
+    <p><strong>Display:</strong> toggle Temp, Rain, Wind sections and Sources rows on/off.<br>
+    <strong>Models:</strong> enable or disable individual forecast sources. Disabled models are excluded from the average.</p>
+
+    <button class="help-close" onclick="hideHelp()">Close</button>
+  </div>
+</div>
 
 <div style="display:none" aria-hidden="true">
   <span id="status-dot"></span>
@@ -262,6 +371,7 @@ const secVisible = { temp:true, wind:false, rain:true };
 // Cached current fetch data for instant re-calc on view change
 let cachedCurrent = null; // { c, precipHourly }
 let cachedForecastRain = null; // array of avg precip for next hours
+let cachedHiLo = null;          // {hi, lo} avg from model daily data for today
 
 let state = { lat:null, lon:null, data:{}, status:{}, view:'1h', ss:{} };
 let autoRefreshTimer=null, nextRefreshAt=null;
@@ -278,7 +388,22 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 function buildSourcesPanel(){
   document.getElementById('model-panel').innerHTML=
-    `<span class="panel-label">Models</span>`+
+    // ── Display toggles ──
+    `<span class="panel-label">Display</span>`+
+    `<div class="model-toggle${secVisible.temp?' enabled':' disabled'}" id="tog-temp" onclick="toggleSection('temp',document.getElementById('tog-temp'))">
+       <span style="font-size:15px">🌡</span><span class="mname" style="color:#86efac">Temp</span>
+     </div>`+
+    `<div class="model-toggle${secVisible.rain?' enabled':' disabled'}" id="tog-rain" onclick="toggleSection('rain',document.getElementById('tog-rain'))">
+       <span style="font-size:15px">🌧</span><span class="mname" style="color:#90caf9">Rain</span>
+     </div>`+
+    `<div class="model-toggle${secVisible.wind?' enabled':' disabled'}" id="tog-wind" onclick="toggleSection('wind',document.getElementById('tog-wind'))">
+       <span style="font-size:15px">💨</span><span class="mname" style="color:#d9f99d">Wind</span>
+     </div>`+
+    `<div class="model-toggle${showDetail?' enabled':' disabled'}" id="detail-in-panel" onclick="toggleDetail()">
+       <span style="font-size:15px">👁</span><span class="mname">Sources</span>
+     </div>`+
+    // ── Model sources ──
+    `<span class="panel-label" style="margin-left:6px">Models</span>`+
     MODELS.map(m=>`
       <div class="model-toggle enabled" id="toggle-${m.key}" onclick="toggleModel('${m.key}')">
         <span class="mdot" style="background:${m.color}">${m.short}</span>
@@ -289,7 +414,7 @@ function buildSourcesPanel(){
 
 function toggleSourcesPanel(){
   document.getElementById('model-panel').classList.toggle('open');
-  document.getElementById('sources-btn').classList.toggle('active');
+  document.getElementById('sources-hdr-btn').classList.toggle('active');
 }
 function toggleModel(key){
   if(autoHidden.has(key))return;
@@ -305,14 +430,16 @@ function toggleDetail(){
   });
 }
 function updateDetailBtn(){
-  const btn=document.getElementById('detail-btn');
-  btn.textContent=showDetail?'👁 Sources':'🙈 Avg only';
-  btn.classList.toggle('active',!showDetail);
+  const panelBtn=document.getElementById('detail-in-panel');
+  if(panelBtn){panelBtn.classList.toggle('enabled',showDetail);panelBtn.classList.toggle('disabled',!showDetail);}
 }
 function toggleSection(sec,btn){
   secVisible[sec]=!secVisible[sec];
-  btn.classList.toggle('on',secVisible[sec]);
-  btn.classList.toggle('off',!secVisible[sec]);
+  // Update whatever button was clicked (panel toggle uses model-toggle classes)
+  if(btn){
+    btn.classList.toggle('enabled', secVisible[sec]);
+    btn.classList.toggle('disabled',!secVisible[sec]);
+  }
   document.querySelectorAll(`.section-group[data-sec="${sec}"]`).forEach(el=>el.classList.toggle('sec-off',!secVisible[sec]));
 }
 
@@ -326,27 +453,72 @@ function scheduleAutoRefresh(){
   updateAutoLabel();
 }
 function updateAutoLabel(){
-  const el=document.getElementById('auto-label');
-  if(!nextRefreshAt)return;
-  const m=Math.max(0,Math.round((nextRefreshAt-Date.now())/60000));
-  el.textContent=m>1?`↻ ${m}m`:m===1?'↻ 1m':'refreshing…';
+  // Timer still runs every hour — display removed from UI
   if(nextRefreshAt>Date.now())setTimeout(updateAutoLabel,30000);
 }
 
 // ══════════════════════════════════════════
 // LOCATION
 // ══════════════════════════════════════════
-function getLocation(){
+async function getLocation(){
   setStatus('spin','Detecting location…');
-  if(!navigator.geolocation){useDefault();return;}
-  navigator.geolocation.getCurrentPosition(
-    pos=>{state.lat=pos.coords.latitude;state.lon=pos.coords.longitude;reverseGeocode(state.lat,state.lon);fetchAllModels();},
-    ()=>useDefault()
-  );
+
+  // 1. Check localStorage for a saved location first (persists across sessions)
+  const saved = loadSavedLocation();
+  if(saved){
+    state.lat=saved.lat; state.lon=saved.lon;
+    document.getElementById('loc-name').textContent=saved.name;
+    fetchAllModels();
+    return;
+  }
+
+  // 2. Try browser GPS — this is the ONLY way to get true location on PC
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
+        reverseGeocode(state.lat,state.lon);
+        fetchAllModels();
+      },
+      err=>{
+        // GPS denied or unavailable — ask user to type their city
+        // IP geolocation is NOT used as it returns ISP city (Sydney for Dubbo users)
+        askUserForCity('Location access denied. Please enter your city:');
+      },
+      {timeout:10000, maximumAge:600000, enableHighAccuracy:false}
+    );
+  } else {
+    askUserForCity('Please enter your city name:');
+  }
 }
+
+function loadSavedLocation(){
+  try{
+    const s=localStorage.getItem('wb_location');
+    return s?JSON.parse(s):null;
+  }catch{return null;}
+}
+
+function saveLocation(lat,lon,name){
+  try{localStorage.setItem('wb_location',JSON.stringify({lat,lon,name}));}catch{}
+}
+
+function clearSavedLocation(){
+  try{localStorage.removeItem('wb_location');}catch{}
+}
+
+function askUserForCity(msg){
+  // Show a non-blocking prompt overlay instead of browser prompt()
+  showCityPrompt(msg);
+}
+
+// IP geolocation removed — unreliable for ISP-routed connections (returns ISP city not user city)
 function useDefault(){
-  state.lat=51.5074;state.lon=-0.1278;
-  document.getElementById('loc-name').textContent='London, UK';
+  // Last resort fallback
+  state.lat=-32.2569;state.lon=148.6011;
+  const name='Dubbo, NSW, AU';
+  document.getElementById('loc-name').textContent=name;
+  saveLocation(state.lat,state.lon,name);
   fetchAllModels();
 }
 async function reverseGeocode(lat,lon){
@@ -355,23 +527,31 @@ async function reverseGeocode(lat,lon){
     const d=await r.json();
     const city=d.address?.city||d.address?.town||d.address?.village||d.address?.suburb||'Your Location';
     const cc=d.address?.country_code?.toUpperCase()||'';
-    document.getElementById('loc-name').textContent=cc?`${city}, ${cc}`:city;
-  }catch{document.getElementById('loc-name').textContent=`${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;}
+    const name=cc?`${city}, ${cc}`:city;
+    document.getElementById('loc-name').textContent=name;
+    saveLocation(lat,lon,name);
+  }catch{
+    const name=`${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+    document.getElementById('loc-name').textContent=name;
+    saveLocation(lat,lon,name);
+  }
 }
 function promptLocation(){
-  const v=prompt('City name (blank = use GPS):');
-  if(v&&v.trim())geocodeCity(v.trim());else getLocation();
+  clearSavedLocation(); // always re-detect when user taps pin
+  showCityPrompt('Enter city name, or leave blank and allow location access:');
 }
 async function geocodeCity(name){
   setStatus('spin',`Searching "${name}"…`);
   try{
     const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(name)}&format=json&limit=1`);
     const d=await r.json();
-    if(!d.length){alert('City not found.');return;}
-    state.lat=parseFloat(d[0].lat);state.lon=parseFloat(d[0].lon);
-    document.getElementById('loc-name').textContent=d[0].display_name.split(',').slice(0,2).join(', ');
+    if(!d.length){showCityPrompt('City not found. Try again:');return;}
+    state.lat=parseFloat(d[0].lat); state.lon=parseFloat(d[0].lon);
+    const locName=d[0].display_name.split(',').slice(0,2).join(', ');
+    document.getElementById('loc-name').textContent=locName;
+    saveLocation(state.lat,state.lon,locName);
     fetchAllModels();
-  }catch{alert('Search failed.');}
+  }catch{showCityPrompt('Search failed. Enter your city:');}
 }
 
 // ══════════════════════════════════════════
@@ -425,9 +605,10 @@ async function fetchAllModels(){
   const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   setStatus('ok',`${ok}/${MODELS.length} models · ${t}${failed.length?' · unavail: '+failed.join(', '):''}`);
 
-  // Build forecast rain cache THEN update current bar so expected rain shows correctly
+  // Build caches THEN update current bar
   buildForecastRainCache();
-  renderCurrentBar();  // re-render now that cachedForecastRain is ready
+  buildHiLoCache();
+  renderCurrentBar();  // re-render now that caches are ready
   scheduleAutoRefresh();
   renderTable();
 }
@@ -446,6 +627,26 @@ function buildForecastRainCache(){
     const idx=si+i;
     return avgOf(onlyEnabled.map(m=>{const d=state.data[m.key];return d?.hourly?.precipitation?.[idx]??null;}));
   });
+}
+
+// ══════════════════════════════════════════
+// BUILD HI/LO CACHE from avg of model daily data
+// ══════════════════════════════════════════
+function buildHiLoCache(){
+  const onlyEnabled=activeEnabled();if(!onlyEnabled.length)return;
+  const todayStr=new Date().toISOString().slice(0,10);
+  const hiVals=onlyEnabled.map(m=>{
+    const d=state.data[m.key]?.daily;if(!d)return null;
+    const di=d.time.findIndex(t=>t===todayStr);if(di<0)return null;
+    return d.temperature_2m_max?.[di]??null;
+  }).filter(v=>v!=null);
+  const loVals=onlyEnabled.map(m=>{
+    const d=state.data[m.key]?.daily;if(!d)return null;
+    const di=d.time.findIndex(t=>t===todayStr);if(di<0)return null;
+    return d.temperature_2m_min?.[di]??null;
+  }).filter(v=>v!=null);
+  const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  cachedHiLo={hi:avg(hiVals),lo:avg(loVals)};
 }
 
 // ══════════════════════════════════════════
@@ -472,9 +673,21 @@ function renderCurrentBar(){
   const {c,precipHourly,daily}=cachedCurrent;
   const stepHrs=state.view==='daily'?24:state.view==='8h'?8:state.view==='3h'?3:1;
 
-  // Past rain: last stepHrs hours of hourly data (all but last element = past)
+  // Past rain: last stepHrs hours
   const past=precipHourly.slice(0,precipHourly.length-1); // exclude current hour
   const pastRain=past.slice(Math.max(0,past.length-stepHrs)).reduce((a,v)=>a+(v||0),0);
+
+  // Rain today: measured (past hours since midnight) + expected (forecast until midnight)
+  const nowDate=new Date();
+  const hourOfDay=nowDate.getHours();
+  // measured = sum of past hourly precip from midnight (last hourOfDay values in past array)
+  const measuredToday=past.slice(Math.max(0,past.length-hourOfDay)).reduce((a,v)=>a+(v||0),0);
+  // expected rest of day = sum of next (23-hourOfDay) hours from forecast
+  const hoursLeftToday=Math.max(0,23-hourOfDay);
+  const expectedToday=cachedForecastRain
+    ?cachedForecastRain.slice(0,hoursLeftToday).reduce((a,v)=>a+(v||0),0)
+    :null;
+  const totalToday=expectedToday!=null?measuredToday+expectedToday:measuredToday;
 
   // Expected rain: from cachedForecastRain, next stepHrs hours
   const expRain=cachedForecastRain
@@ -484,9 +697,9 @@ function renderCurrentBar(){
   const lbl=stepHrs===1?'Rain past 1hr':stepHrs===24?'Rain past 24hr':`Rain past ${stepHrs}hr`;
   const expLbl=stepHrs===1?'Rain next 1hr':stepHrs===24?'Rain next 24hr':`Rain next ${stepHrs}hr`;
 
-  // Today's hi/lo from daily fetch
-  const todayHi=daily?.temperature_2m_max?.[0];
-  const todayLo=daily?.temperature_2m_min?.[0];
+  // Today's hi/lo from model average (matches table avg row)
+  const todayHi=cachedHiLo?.hi??daily?.temperature_2m_max?.[0];
+  const todayLo=cachedHiLo?.lo??daily?.temperature_2m_min?.[0];
 
   // Wind direction as arrow
   const windArrow=dirArrow16(c.winddirection_10m);
@@ -498,6 +711,17 @@ function renderCurrentBar(){
   document.getElementById('curr-desc').innerHTML=`<strong>${wxDesc(c.weathercode,c.is_day)}</strong>`;
   document.getElementById('curr-feels').textContent=`Feels ${Math.round(c.apparent_temperature)}° · ${c.relative_humidity_2m}% humidity`;
   document.getElementById('curr-synopsis').textContent=buildSynopsis(c);
+
+  // Today rain display
+  const todayEl=document.getElementById('curr-today-rain');
+  const todaySubEl=document.getElementById('curr-today-sub');
+  if(todayEl){
+    todayEl.textContent=`${totalToday.toFixed(1)} mm`;
+    const subParts=[];
+    if(measuredToday>0)subParts.push(`${measuredToday.toFixed(1)} measured`);
+    if(expectedToday!=null&&expectedToday>0)subParts.push(`${expectedToday.toFixed(1)} expected`);
+    todaySubEl.textContent=subParts.length?subParts.join(' + '):'None so far';
+  }
 
   document.getElementById('curr-past-lbl').textContent=lbl;
   document.getElementById('curr-past-rain').textContent=`${pastRain.toFixed(1)} mm`;
@@ -660,7 +884,7 @@ function renderHourly(){
   const tempModelRows=allActive.map(m=>{
     const v=hVals(m.key,'temperature_2m',indices);
     const cells=v.map((x,ci)=>injectColCls(`<td class="${x!=null?tempCls(x):''}">${x!=null?x.toFixed(0)+'°':'—'}</td>`,ndCls[ci])).join('');
-    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:11px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
+    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
   }).join('');
   const avgTemp=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>hVals(m.key,'temperature_2m',indices)[ci])));
   const avgTempCells=avgTemp.map((v,ci)=>{
@@ -680,7 +904,7 @@ function renderHourly(){
   const rainModelRows=allActive.map(m=>{
     const v=hVals(m.key,'precipitation',indices);
     const cells=v.map((x,ci)=>{const cls=rainCls(x);const txt=x==null?'—':x<0.05?'<span class="empty">0</span>':x.toFixed(1);return injectColCls(`<td class="${cls}">${txt}</td>`,ndCls[ci]);}).join('');
-    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:11px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
+    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
   }).join('');
   const avgRain=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>hVals(m.key,'precipitation',indices)[ci])));
   const avgRainCells=avgRain.map((v,ci)=>{const cls=rainCls(v);const txt=v==null?'—':v<0.05?'<span class="empty">0</span>':v.toFixed(1);return injectColCls(`<td class="${cls}">${txt}</td>`,ndCls[ci]);}).join('');
@@ -692,7 +916,7 @@ function renderHourly(){
     <tbody>
       <tr class="hour-header"><th class="row-label"></th>${hdrCells}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
-      <tr class="icon-row"><td class="row-label" style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px">Conditions</td>${iconCells}</tr>
+      <tr class="icon-row"><td class="row-label" style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px">Conditions</td>${iconCells}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
     </tbody>
     ${secGroup('temp',`
@@ -707,7 +931,7 @@ function renderHourly(){
     `)}
     ${secGroup('wind',`
       <tr class="sec-head-wind"><td class="row-label">💨 Wind km/h</td>${avgWindCells}</tr>
-      <tr class="data-row src-row"><td class="row-label" style="font-size:10px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
+      <tr class="data-row src-row"><td class="row-label" style="font-size:13px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
     `)}`;
 }
 
@@ -738,12 +962,12 @@ function renderDaily(){
 
   const tempModelRows=allActive.map(m=>{
     const mx=dVals(m.key,'temperature_2m_max'),mn=dVals(m.key,'temperature_2m_min');
-    const cells=mx.map((hi,ci)=>{const lo=mn[ci],cls=hi!=null?tempCls(hi):'';return`<td class="${cls}"><span style="font-size:12px">${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:10px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;}).join('');
-    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:11px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
+    const cells=mx.map((hi,ci)=>{const lo=mn[ci],cls=hi!=null?tempCls(hi):'';return`<td class="${cls}"><span style="font-size:15px">${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;}).join('');
+    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
   }).join('');
   const avgMax=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>dVals(m.key,'temperature_2m_max')[ci])));
   const avgMin=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>dVals(m.key,'temperature_2m_min')[ci])));
-  const avgTempCells=avgMax.map((hi,ci)=>{const lo=avgMin[ci],cls=hi!=null?tempCls(hi):'';return`<td class="${cls}"><span>${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:10px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;}).join('');
+  const avgTempCells=avgMax.map((hi,ci)=>{const lo=avgMin[ci],cls=hi!=null?tempCls(hi):'';return`<td class="${cls}"><span>${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;}).join('');
 
   const avgWind=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>dVals(m.key,'windspeed_10m_max')[ci])));
   const avgWindCells=avgWind.map(v=>`<td class="${v!=null?windCls(v):''}">${fmt(v,0)}</td>`).join('');
@@ -751,7 +975,7 @@ function renderDaily(){
   const rainModelRows=allActive.map(m=>{
     const v=dVals(m.key,'precipitation_sum');
     const cells=v.map(x=>{const cls=rainCls(x),txt=x==null?'—':x<0.1?'<span class="empty">0</span>':x.toFixed(1);return`<td class="${cls}">${txt}</td>`;}).join('');
-    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:11px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
+    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
   }).join('');
   const avgRain=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>dVals(m.key,'precipitation_sum')[ci])));
   const avgRainCells=avgRain.map(v=>{const cls=rainCls(v),txt=v==null?'—':v<0.1?'<span class="empty">0</span>':v.toFixed(1);return`<td class="${cls}">${txt}</td>`;}).join('');
@@ -760,7 +984,7 @@ function renderDaily(){
     <tbody>
       <tr class="hour-header"><th class="row-label"></th>${dayHdrs}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
-      <tr class="icon-row"><td class="row-label" style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px">Conditions</td>${iconCells}</tr>
+      <tr class="icon-row"><td class="row-label" style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px">Conditions</td>${iconCells}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
     </tbody>
     ${secGroup('temp',`
@@ -792,6 +1016,36 @@ function updatePills(){
   }).join(' ');
 }
 function showErr(msg){document.getElementById('err-area').innerHTML=`<div class="err-banner">⚠️ ${msg}</div>`;}
+function showCityPrompt(msg){
+  document.getElementById('city-prompt-msg').textContent=msg||'Enter your city name:';
+  document.getElementById('city-input').value='';
+  document.getElementById('city-overlay').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('city-input').focus(),100);
+}
+function hideCityPrompt(){
+  document.getElementById('city-overlay').classList.add('hidden');
+}
+function submitCity(){
+  const v=document.getElementById('city-input').value.trim();
+  if(!v)return;
+  hideCityPrompt();
+  geocodeCity(v);
+}
+function tryGPS(){
+  hideCityPrompt();
+  clearSavedLocation();
+  if(!navigator.geolocation){showCityPrompt('GPS not available. Enter your city:');return;}
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      state.lat=pos.coords.latitude;state.lon=pos.coords.longitude;
+      reverseGeocode(state.lat,state.lon);fetchAllModels();
+    },
+    ()=>showCityPrompt('GPS denied. Please enter your city:'),
+    {timeout:10000,maximumAge:0,enableHighAccuracy:false}
+  );
+}
+function showHelp(){document.getElementById('help-overlay').classList.remove('hidden');}
+function hideHelp(e){if(!e||e.target===document.getElementById('help-overlay'))document.getElementById('help-overlay').classList.add('hidden');}
 </script>
 </body>
 </html>
