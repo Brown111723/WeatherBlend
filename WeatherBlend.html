@@ -181,6 +181,14 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .help-modal .swatch{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);}
 .help-modal .sw{width:22px;height:14px;border-radius:3px;display:inline-block;}
 .help-close{position:sticky;bottom:0;width:100%;margin-top:20px;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;}
+/* Weight badge next to model name */
+.weight-badge{font-size:10px;color:var(--text-dim);margin-left:4px;font-family:'Inter',sans-serif;font-weight:500;}
+.weight-badge.high{color:#4ade80;}
+.weight-badge.mid{color:#fbbf24;}
+.weight-badge.low{color:#f87171;}
+/* Actual data row */
+.actual-row td{text-align:center;padding:5px 3px;font-size:13px;color:var(--text-primary);border-top:1px dashed var(--border2);font-style:italic;}
+.actual-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;color:var(--text-muted);font-style:normal;}
 .err-banner{margin:10px 20px;padding:12px 16px;background:#2a1010;border:1px solid #5a1a1a;border-radius:8px;color:#f87171;font-size:15px;}
 .source-note{padding:14px 20px;font-size:13px;color:var(--text-dim);}
 .source-note a{color:var(--text-muted);text-decoration:none;}
@@ -362,6 +370,9 @@ const secVisible = { temp:true, wind:false, rain:true };
 let cachedCurrent = null; // { c, precipHourly }
 let cachedForecastRain = null; // array of avg precip for next hours
 let cachedHiLo = null;          // {hi, lo} avg from model daily data for today
+let modelWeights = {};             // key -> weight 0-1 (sum=1 across enabled models)
+let useWeightedAvg = true;         // toggled by config panel
+let actualData = null;             // historical ERA5 actuals for past 7 days
 
 let state = { lat:null, lon:null, data:{}, status:{}, view:'1h', ss:{} };
 let autoRefreshTimer=null, nextRefreshAt=null;
@@ -391,6 +402,9 @@ function buildSourcesPanel(){
      </div>`+
     `<div class="model-toggle${showDetail?' enabled':' disabled'}" id="detail-in-panel" onclick="toggleDetail()">
        <span style="font-size:15px">👁</span><span class="mname">Sources</span>
+     </div>`+
+    `<div class="model-toggle${useWeightedAvg?' enabled':' disabled'}" id="tog-weighted" onclick="toggleWeighting(this)">
+       <span style="font-size:15px">⚖️</span><span class="mname">Weighted avg</span>
      </div>`+
     // ── Model sources ──
     `<span class="panel-label" style="margin-left:6px">Models</span>`+
@@ -423,6 +437,12 @@ function updateDetailBtn(){
   const panelBtn=document.getElementById('detail-in-panel');
   if(panelBtn){panelBtn.classList.toggle('enabled',showDetail);panelBtn.classList.toggle('disabled',!showDetail);}
 }
+function toggleWeighting(btn){
+  useWeightedAvg=!useWeightedAvg;
+  if(btn){btn.classList.toggle('enabled',useWeightedAvg);btn.classList.toggle('disabled',!useWeightedAvg);}
+  if(Object.keys(state.data).length)renderTable();
+}
+
 function toggleSection(sec,btn){
   secVisible[sec]=!secVisible[sec];
   // Update whatever button was clicked (panel toggle uses model-toggle classes)
@@ -462,8 +482,27 @@ async function getLocation(){
     return;
   }
 
-  // 2. Try browser GPS — this is the ONLY way to get true location on PC
+  // 2. Detect sandboxed iframe (Claude preview, etc.) — GPS is always blocked there.
+  //    Try to detect by checking if we're in an iframe with a different origin,
+  //    or if the Permissions API says geolocation is denied before we even ask.
+  const inIframe = (() => { try { return window.self !== window.top; } catch(e){ return true; } })();
+  if(inIframe){
+    showCityPrompt('Enter your city name to get started:');
+    return;
+  }
+
+  // 3. Try browser GPS — this is the ONLY way to get true location on PC
   if(navigator.geolocation){
+    // Check permission state first if Permissions API available (avoids silent denial)
+    if(navigator.permissions){
+      try{
+        const perm = await navigator.permissions.query({name:'geolocation'});
+        if(perm.state==='denied'){
+          showCityPrompt('Location access is blocked. Enter your city:');
+          return;
+        }
+      }catch{}
+    }
     navigator.geolocation.getCurrentPosition(
       pos=>{
         state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
@@ -471,9 +510,7 @@ async function getLocation(){
         fetchAllModels();
       },
       err=>{
-        // GPS denied or unavailable — ask user to type their city
-        // IP geolocation is NOT used as it returns ISP city (Sydney for Dubbo users)
-        askUserForCity('Location access denied. Please enter your city:');
+        askUserForCity('Could not detect location. Please enter your city:');
       },
       {timeout:10000, maximumAge:600000, enableHighAccuracy:false}
     );
@@ -512,6 +549,7 @@ function useDefault(){
   fetchAllModels();
 }
 async function reverseGeocode(lat,lon){
+  // Try Nominatim first (works on real browsers), fall back to coords display
   try{
     const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
     const d=await r.json();
@@ -521,6 +559,7 @@ async function reverseGeocode(lat,lon){
     document.getElementById('loc-name').textContent=name;
     saveLocation(lat,lon,name);
   }catch{
+    // Nominatim blocked (e.g. iframe) — show coords, still works fine
     const name=`${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
     document.getElementById('loc-name').textContent=name;
     saveLocation(lat,lon,name);
@@ -533,15 +572,24 @@ function promptLocation(){
 async function geocodeCity(name){
   setStatus('spin',`Searching "${name}"…`);
   try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(name)}&format=json&limit=1`);
+    // Use Open-Meteo geocoding — works everywhere including Claude's iframe preview
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`);
     const d=await r.json();
-    if(!d.length){showCityPrompt('City not found. Try again:');return;}
-    state.lat=parseFloat(d[0].lat); state.lon=parseFloat(d[0].lon);
-    const locName=d[0].display_name.split(',').slice(0,2).join(', ');
+    if(!d.results||!d.results.length){showCityPrompt('City not found. Try a different spelling:');return;}
+    const result=d.results[0];
+    state.lat=result.latitude; state.lon=result.longitude;
+    // Build a clean location name from the result
+    const parts=[result.name];
+    if(result.admin1)parts.push(result.admin1);
+    if(result.country_code)parts.push(result.country_code);
+    const locName=parts.join(', ');
     document.getElementById('loc-name').textContent=locName;
     saveLocation(state.lat,state.lon,locName);
     fetchAllModels();
-  }catch{showCityPrompt('Search failed. Enter your city:');}
+  }catch(e){
+    console.warn('Geocode failed:',e);
+    showCityPrompt('Search failed. Check connection and try again:');
+  }
 }
 
 // ══════════════════════════════════════════
@@ -595,10 +643,12 @@ async function fetchAllModels(){
   const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   setStatus('ok',`${ok}/${MODELS.length} models · ${t}${failed.length?' · unavail: '+failed.join(', '):''}`);
 
-  // Build caches THEN update current bar
+  // Build caches, fetch actuals, compute weights, then render
   buildForecastRainCache();
   buildHiLoCache();
-  renderCurrentBar();  // re-render now that caches are ready
+  await fetchActualsAndComputeWeights();
+  renderCurrentBar();
+  buildSourcesPanel(); // rebuild to show weight badges
   scheduleAutoRefresh();
   renderTable();
 }
@@ -615,7 +665,7 @@ function buildForecastRainCache(){
   // store next 25 hourly avg values
   cachedForecastRain=Array.from({length:25},(_,i)=>{
     const idx=si+i;
-    return avgOf(onlyEnabled.map(m=>{const d=state.data[m.key];return d?.hourly?.precipitation?.[idx]??null;}));
+    return weightedAvgOf(onlyEnabled.map(m=>({key:m.key, val:state.data[m.key]?.hourly?.precipitation?.[idx]??null})));
   });
 }
 
@@ -635,6 +685,7 @@ function buildHiLoCache(){
     const di=d.time.findIndex(t=>t===todayStr);if(di<0)return null;
     return d.temperature_2m_min?.[di]??null;
   }).filter(v=>v!=null);
+  // Use equal weights for hi/lo cache (weights may not be ready yet)
   const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
   cachedHiLo={hi:avg(hiVals),lo:avg(loVals)};
 }
@@ -738,6 +789,110 @@ function isDay(tsMs,dateStr){
   return tsMs>=s.riseMs&&tsMs<s.setMs;
 }
 function isDayStart(iso,prevIso){return prevIso&&iso.slice(0,10)!==prevIso.slice(0,10);}
+
+
+// ══════════════════════════════════════════
+// HISTORICAL ACTUALS + MODEL WEIGHT CALC
+// ══════════════════════════════════════════
+async function fetchActualsAndComputeWeights(){
+  try{
+    // Fetch ERA5 reanalysis actuals for past 7 days
+    const endDate=new Date(); endDate.setDate(endDate.getDate()-1);
+    const startDate=new Date(); startDate.setDate(startDate.getDate()-7);
+    const fmt=d=>d.toISOString().slice(0,10);
+
+    const url=`https://archive-api.open-meteo.com/v1/archive`
+      +`?latitude=${state.lat}&longitude=${state.lon}`
+      +`&hourly=temperature_2m,precipitation`
+      +`&start_date=${fmt(startDate)}&end_date=${fmt(endDate)}`
+      +`&timezone=auto`;
+
+    const res=await fetch(url);
+    if(!res.ok)throw new Error('Archive API failed');
+    const json=await res.json();
+    if(json.error)throw new Error(json.reason);
+    actualData=json;
+
+    // For each enabled model, find matching hours and compute RMSE vs actuals
+    const activeMods=activeEnabled();
+    if(activeMods.length===0)return;
+
+    const actTimes=json.hourly.time;
+    const actTemps=json.hourly.temperature_2m;
+    const actRain=json.hourly.precipitation;
+
+    // Build a time->index map for actuals
+    const actMap={};
+    actTimes.forEach((t,i)=>{ actMap[t]=i; });
+
+    const errors={}; // key -> {tempSqErr, rainSqErr, n}
+    activeMods.forEach(m=>{ errors[m.key]={tempSqErr:0,rainSqErr:0,n:0}; });
+
+    activeMods.forEach(m=>{
+      const mHourly=state.data[m.key]?.hourly;
+      if(!mHourly)return;
+      mHourly.time.forEach((t,i)=>{
+        const ai=actMap[t];
+        if(ai===undefined)return;
+        const mTemp=mHourly.temperature_2m?.[i];
+        const mRain=mHourly.precipitation?.[i];
+        const aTemp=actTemps[ai];
+        const aRain=actRain[ai];
+        if(mTemp!=null&&aTemp!=null){
+          errors[m.key].tempSqErr+=(mTemp-aTemp)**2;
+          errors[m.key].n++;
+        }
+        if(mRain!=null&&aRain!=null){
+          errors[m.key].rainSqErr+=(mRain-aRain)**2;
+        }
+      });
+    });
+
+    // RMSE per model (combined temp + rain, normalised)
+    const rmse={};
+    activeMods.forEach(m=>{
+      const e=errors[m.key];
+      if(e.n===0){rmse[m.key]=999;return;}
+      const tempRMSE=Math.sqrt(e.tempSqErr/e.n);
+      const rainRMSE=Math.sqrt(e.rainSqErr/e.n);
+      // Combine: temp weighted 70%, rain 30%
+      rmse[m.key]=tempRMSE*0.7+rainRMSE*0.3;
+    });
+
+    // Convert RMSE to weights: lower error = higher weight
+    // Use inverse-error weighting: w_i = (1/RMSE_i) / sum(1/RMSE_j)
+    const invSum=activeMods.reduce((s,m)=>s+(rmse[m.key]>0?1/rmse[m.key]:0),0);
+    modelWeights={};
+    activeMods.forEach(m=>{
+      modelWeights[m.key]=invSum>0?(rmse[m.key]>0?(1/rmse[m.key])/invSum:0):1/activeMods.length;
+    });
+
+    console.log('Model weights:',JSON.stringify(
+      Object.fromEntries(Object.entries(modelWeights).map(([k,v])=>[k,(v*100).toFixed(1)+'%']))
+    ));
+  }catch(e){
+    console.warn('Actuals fetch failed:',e.message);
+    // Fall back to equal weights
+    const activeMods=activeEnabled();
+    modelWeights={};
+    activeMods.forEach(m=>{ modelWeights[m.key]=1/activeMods.length; });
+  }
+}
+
+// ══════════════════════════════════════════
+// WEIGHTED AVERAGE (replaces avgOf for model data)
+// ══════════════════════════════════════════
+function weightedAvgOf(modelValPairs){
+  const valid=modelValPairs.filter(p=>p.val!=null&&!isNaN(p.val));
+  if(!valid.length)return null;
+  // If weighting is off, or no weights computed yet, use simple equal average
+  if(!useWeightedAvg||!Object.keys(modelWeights).length){
+    return valid.reduce((s,p)=>s+p.val,0)/valid.length;
+  }
+  const totalW=valid.reduce((s,p)=>s+(modelWeights[p.key]||0),0);
+  if(totalW===0)return valid.reduce((s,p)=>s+p.val,0)/valid.length;
+  return valid.reduce((s,p)=>s+p.val*(modelWeights[p.key]||0),0)/totalW;
+}
 
 // ══════════════════════════════════════════
 // HELPERS
@@ -844,9 +999,9 @@ function renderHourly(){
   const tempModelRows=allActive.map(m=>{
     const v=hVals(m.key,'temperature_2m',indices);
     const cells=v.map((x,ci)=>injectColCls(`<td class="${x!=null?tempCls(x):''}">${x!=null?x.toFixed(0)+'°':'—'}</td>`,ndCls[ci])).join('');
-    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
+    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}${(()=>{const w=modelWeights[m.key];if(!w)return '';const pct=Math.round(w*100);const cls=pct>=20?'high':pct>=10?'mid':'low';return '<span class="weight-badge '+cls+'">'+pct+'%</span>';})()}</span></span></td>${cells}</tr>`;
   }).join('');
-  const avgTemp=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>hVals(m.key,'temperature_2m',indices)[ci])));
+  const avgTemp=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,'temperature_2m',indices)[ci]}))));
   const avgTempCells=avgTemp.map((v,ci)=>{
     const cls=v!=null?tempCls(v):'';
     const hl=hiloKey?dailyHiLo(hiloKey,ref.time[indices[ci]]):null;
@@ -855,22 +1010,42 @@ function renderHourly(){
   }).join('');
 
   // ── WIND ──
-  const avgWind=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>hVals(m.key,'windspeed_10m',indices)[ci])));
+  const avgWind=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,'windspeed_10m',indices)[ci]}))));
   const avgWindCells=avgWind.map((v,ci)=>injectColCls(`<td class="${v!=null?windCls(v):''}">${fmt(v,0)}</td>`,ndCls[ci])).join('');
-  const avgDir=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>hVals(m.key,'winddirection_10m',indices)[ci])));
+  const avgDir=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,'winddirection_10m',indices)[ci]}))));
   const avgDirCells=avgDir.map((v,ci)=>injectColCls(`<td class="dir-cell">${v!=null?dirArrow(v):'—'}</td>`,ndCls[ci])).join('');
 
   // ── RAIN ──
   const rainModelRows=allActive.map(m=>{
     const v=hVals(m.key,'precipitation',indices);
     const cells=v.map((x,ci)=>{const cls=rainCls(x);const txt=x==null?'—':x<0.05?'<span class="empty">0</span>':x.toFixed(1);return injectColCls(`<td class="${cls}">${txt}</td>`,ndCls[ci]);}).join('');
-    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
+    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}${(()=>{const w=modelWeights[m.key];if(!w)return '';const pct=Math.round(w*100);const cls=pct>=20?'high':pct>=10?'mid':'low';return '<span class="weight-badge '+cls+'">'+pct+'%</span>';})()}</span></span></td>${cells}</tr>`;
   }).join('');
-  const avgRain=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>hVals(m.key,'precipitation',indices)[ci])));
+  const avgRain=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,'precipitation',indices)[ci]}))));
   const avgRainCells=avgRain.map((v,ci)=>{const cls=rainCls(v);const txt=v==null?'—':v<0.05?'<span class="empty">0</span>':v.toFixed(1);return injectColCls(`<td class="${cls}">${txt}</td>`,ndCls[ci]);}).join('');
 
   const iconKey=onlyEnabled[0]?.key||allActive[0]?.key;
   const iconCells=hVals(iconKey,'weathercode',indices).map((c,ci)=>injectColCls(`<td>${wxIcon(c)}</td>`,ndCls[ci])).join('');
+
+
+  // ── Actual (ERA5) data rows ──
+  function buildActualCells(field, indices, fmtFn, clsFn){
+    if(!actualData)return indices.map(()=>'<td class="empty">–</td>').join('');
+    const actTimes=actualData.hourly.time;
+    const actVals=actualData.hourly[field]||[];
+    const actMap={};actTimes.forEach((t,i)=>{actMap[t]=i;});
+    return indices.map(i=>{
+      const t=ref.time[i];
+      const ai=actMap[t];
+      if(ai===undefined)return '<td class="empty">–</td>';
+      const v=actVals[ai];
+      if(v==null)return '<td class="empty">–</td>';
+      const cls=clsFn?clsFn(v):'';
+      return injectColCls(`<td class="${cls}">${fmtFn(v)}</td>`,ndCls[i<indices.length?indices.indexOf(i):0]);
+    }).join('');
+  }
+  const actualTempCells=buildActualCells('temperature_2m',indices,v=>v.toFixed(0)+'°',tempCls);
+  const actualRainCells=buildActualCells('precipitation',indices,v=>v<0.05?'<span class="empty">0</span>':v.toFixed(1),rainCls);
 
   document.querySelector('.ftable').innerHTML=`
     <tbody>
@@ -882,11 +1057,13 @@ function renderHourly(){
     ${secGroup('temp',`
       <tr class="sec-head-temp"><td class="row-label">🌡 Temp</td>${avgTempCells}</tr>
       ${tempModelRows}
+      ${actualData?`<tr class="actual-row src-row${showDetail?'':' src-hidden'}"><td class="row-label">✓ Actual</td>${actualTempCells}</tr>`:''}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('rain',`
       <tr class="sec-head-rain"><td class="row-label">🌧 Rain mm/hr</td>${avgRainCells}</tr>
       ${rainModelRows}
+      ${actualData?`<tr class="actual-row src-row${showDetail?'':' src-hidden'}"><td class="row-label">✓ Actual</td>${actualRainCells}</tr>`:''}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('wind',`
@@ -923,21 +1100,21 @@ function renderDaily(){
   const tempModelRows=allActive.map(m=>{
     const mx=dVals(m.key,'temperature_2m_max'),mn=dVals(m.key,'temperature_2m_min');
     const cells=mx.map((hi,ci)=>{const lo=mn[ci],cls=hi!=null?tempCls(hi):'';return`<td class="${cls}"><span style="font-size:15px">${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;}).join('');
-    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
+    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}${(()=>{const w=modelWeights[m.key];if(!w)return '';const pct=Math.round(w*100);const cls=pct>=20?'high':pct>=10?'mid':'low';return '<span class="weight-badge '+cls+'">'+pct+'%</span>';})()}</span></span></td>${cells}</tr>`;
   }).join('');
-  const avgMax=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>dVals(m.key,'temperature_2m_max')[ci])));
-  const avgMin=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>dVals(m.key,'temperature_2m_min')[ci])));
+  const avgMax=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'temperature_2m_max')[ci]}))));
+  const avgMin=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'temperature_2m_min')[ci]}))));
   const avgTempCells=avgMax.map((hi,ci)=>{const lo=avgMin[ci],cls=hi!=null?tempCls(hi):'';return`<td class="${cls}"><span>${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;}).join('');
 
-  const avgWind=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>dVals(m.key,'windspeed_10m_max')[ci])));
+  const avgWind=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'windspeed_10m_max')[ci]}))));
   const avgWindCells=avgWind.map(v=>`<td class="${v!=null?windCls(v):''}">${fmt(v,0)}</td>`).join('');
 
   const rainModelRows=allActive.map(m=>{
     const v=dVals(m.key,'precipitation_sum');
     const cells=v.map(x=>{const cls=rainCls(x),txt=x==null?'—':x<0.1?'<span class="empty">0</span>':x.toFixed(1);return`<td class="${cls}">${txt}</td>`;}).join('');
-    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}</span></span></td>${cells}</tr>`;
+    return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:14px;color:var(--text-muted)">${m.label}${(()=>{const w=modelWeights[m.key];if(!w)return '';const pct=Math.round(w*100);const cls=pct>=20?'high':pct>=10?'mid':'low';return '<span class="weight-badge '+cls+'">'+pct+'%</span>';})()}</span></span></td>${cells}</tr>`;
   }).join('');
-  const avgRain=indices.map((_,ci)=>avgOf(onlyEnabled.map(m=>dVals(m.key,'precipitation_sum')[ci])));
+  const avgRain=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'precipitation_sum')[ci]}))));
   const avgRainCells=avgRain.map(v=>{const cls=rainCls(v),txt=v==null?'—':v<0.1?'<span class="empty">0</span>':v.toFixed(1);return`<td class="${cls}">${txt}</td>`;}).join('');
 
   document.querySelector('.ftable').innerHTML=`
