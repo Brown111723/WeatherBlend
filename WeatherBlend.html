@@ -106,10 +106,10 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 /* ── Table ── */
 .table-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);padding-bottom:40px;position:relative;}
-#now-overlay{position:absolute;top:0;height:100%;width:0;border-left:1px dotted #ef4444;pointer-events:none;z-index:19;display:none;}
-#past-overlay{position:absolute;top:0;left:0;width:0;height:100%;background:rgba(0,0,0,0.35);pointer-events:none;z-index:18;display:none;}
-#past-overlay-h{position:absolute;left:0;top:0;width:100%;height:0;background:rgba(0,0,0,0.35);pointer-events:none;z-index:18;display:none;}
-#now-overlay-h{position:absolute;left:0;width:100%;height:0;border-top:1px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
+#now-overlay{position:absolute;top:0;height:100%;width:0;border-left:1px dotted #ef4444;pointer-events:none;z-index:5;display:none;}
+#past-overlay{position:absolute;top:0;left:0;width:0;height:100%;background:rgba(0,0,0,0.35);pointer-events:none;z-index:4;display:none;}
+#past-overlay-h{position:absolute;left:0;top:0;width:100%;height:0;background:rgba(0,0,0,0.35);pointer-events:none;z-index:4;display:none;}
+#now-overlay-h{position:absolute;left:0;width:100%;height:0;border-top:1px dotted #ef4444;pointer-events:none;z-index:5;display:none;}
 .ftable{width:100%;border-collapse:separate;border-spacing:0;font-family:'JetBrains Mono',monospace;}
 .ftable th,.ftable td{white-space:nowrap;}
 .row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:98px;max-width:98px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
@@ -1099,6 +1099,10 @@ function renderVertical_buildColDef(){
   if(secVisible.wind){
     cols.push({id:'wind',   hdr:'💨', hdrCls:'sec-head-wind'});
   }
+  if(secVisible.cloud){
+    cols.push({id:'cloud',  hdr:'☁️', hdrCls:''});
+    if(actualData) cols.push({id:'act_cl', hdr:'✓☁️', hdrCls:''});
+  }
   return{cols,actMap,nowMs};
 }
 
@@ -1130,6 +1134,16 @@ function renderVertical_cellVal(colId,i,onlyEnabled,actMap,nowMs,ref){
       return`<td class="${v!=null?rainCls(v):''}">${v!=null?(v<0.05?'<span class="empty">0</span>':v.toFixed(1)):'–'}</td>`;
     }
     case'cloud':{const v=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.cloudcover?.[i]??null})));return`<td class="${cloudCls(v)}">${v!=null?Math.round(v)+'%':'—'}</td>`;}
+    case'cloud':{
+      const v=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.cloudcover?.[i]??null})));
+      return`<td class="${cloudCls(v)}">${v!=null?Math.round(v)+'%':'—'}</td>`;
+    }
+    case'act_cl':{
+      if(new Date(ref.time[i]).getTime()>=nowMs)return'<td class="empty">–</td>';
+      const ai=actMap[ref.time[i]];
+      const v=ai!==undefined?actualData.hourly.cloudcover?.[ai]:null;
+      return`<td class="${v!=null?cloudCls(v):''}">${v!=null?Math.round(v)+'%':'–'}</td>`;
+    }
     default:return'<td>–</td>';
   }
 }
@@ -1288,21 +1302,17 @@ function positionNowOverlay(){
       const nowTh=wrap.querySelector('.hour-header th.now-col');
       if(nowTh&&ovV){
         const leftEdge=nowTh.offsetLeft;
-        const totalH=wrap.scrollHeight;
-        const contentH=totalH-hdrH;
-
-        // Red dotted line: starts below header, full content height
+        // Overlays span full scroll height; sticky header sits on top via z-index
         ovV.style.left=leftEdge+'px';
-        ovV.style.top=hdrH+'px';
-        ovV.style.height=contentH+'px';
+        ovV.style.top='0';
+        ovV.style.height='100%';
         ovV.style.display='block';
-
-        // Dark past overlay: from sticky label width to left edge of now col, below header
-        const labelW=98; // sticky row-label width
+        // Past overlay: from label col edge to now col left edge
+        const labelW=98;
         pastV.style.left=labelW+'px';
-        pastV.style.top=hdrH+'px';
+        pastV.style.top='0';
         pastV.style.width=Math.max(0,leftEdge-labelW)+'px';
-        pastV.style.height=contentH+'px';
+        pastV.style.height='100%';
         pastV.style.display='block';
       } else {
         if(ovV)ovV.style.display='none';
@@ -1316,18 +1326,15 @@ function positionNowOverlay(){
       if(nowRow&&ovH){
         const topEdge=nowRow.offsetTop;
         const totalW=wrap.scrollWidth;
-
-        // Red dotted line: left of label col to full width, at top of now row
         ovH.style.top=topEdge+'px';
         ovH.style.left='0';
-        ovH.style.width=totalW+'px';
+        ovH.style.width='100%';
         ovH.style.display='block';
-
-        // Dark past overlay: from header bottom to top of now row
-        pastH.style.top=hdrH+'px';
+        // Past overlay: from top (sticky header sits over it) to now row
+        pastH.style.top='0';
         pastH.style.left='0';
-        pastH.style.width=totalW+'px';
-        pastH.style.height=Math.max(0,topEdge-hdrH)+'px';
+        pastH.style.width='100%';
+        pastH.style.height=Math.max(0,topEdge)+'px';
         pastH.style.display='block';
       } else {
         if(ovH)ovH.style.display='none';
