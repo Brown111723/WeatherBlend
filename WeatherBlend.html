@@ -105,14 +105,16 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .lsw{width:11px;height:7px;border-radius:2px;display:inline-block;vertical-align:middle;}
 
 /* ── Table ── */
-.table-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);padding-bottom:40px;}
+.table-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);padding-bottom:40px;position:relative;}
+#now-overlay{position:absolute;top:0;bottom:0;width:0;border-left:2px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
+#now-overlay-h{position:absolute;left:0;right:0;height:0;border-top:2px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
 .ftable{width:100%;border-collapse:separate;border-spacing:0;font-family:'JetBrains Mono',monospace;}
 .ftable th,.ftable td{white-space:nowrap;}
 .row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:98px;max-width:98px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
 .hour-header th.row-label{background:var(--bg);z-index:15;}
 .hour-header th{padding:12px 6px 8px;font-size:14px;font-weight:500;color:var(--text-muted);text-align:center;background:var(--bg);position:sticky;top:0;z-index:10;min-width:64px;border-bottom:2px solid var(--border);}
-.hour-header th.now-col{color:#ef4444;border-bottom-color:#ef4444;}
-.ftable th.now-col,.ftable td.now-col{border-left:2px dotted #ef4444!important;}
+.hour-header th.now-col{color:#ef4444;}
+
 
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
 .day-col{background:var(--day-bg)!important;}
@@ -204,7 +206,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .weight-badge.mid{color:#fbbf24;}
 .weight-badge.low{color:#f87171;}
 /* Actual data row */
-.now-row td{border-top:2px dotted #ef4444!important;border-bottom:2px dotted #ef4444!important;}
+.now-row td{}
 .past-col{opacity:0.60!important;}
 .actual-row td{text-align:center;padding:5px 3px;font-size:13px;color:var(--text-primary);border-top:1px dashed var(--border2);font-style:italic;}
 .actual-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;color:var(--text-muted);font-style:normal;}
@@ -352,7 +354,9 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 
 
-<div class="table-wrap">
+<div class="table-wrap" id="table-wrap" onscroll="positionNowOverlay()">
+  <div id="now-overlay"></div>
+  <div id="now-overlay-h"></div>
   <table class="ftable"><tbody id="tbody">
     <tr><td style="padding:40px 20px;color:var(--text-muted)"><span class="sk" style="width:180px;height:14px"></span></td></tr>
   </tbody></table>
@@ -410,9 +414,9 @@ window.addEventListener('DOMContentLoaded',()=>{
 function buildSourcesPanel(){
   const e=(v)=>v?"enabled":"disabled";
   const ti=(id,cls,icon,fn,lbl)=>
-    `<div class="tog-item" onclick="${fn}">`+
-    `<div class="tog-btn ${cls}" id="${id}">${icon}</div>`+
-    `<span class="tog-label">${lbl}</span></div>`;
+    `<div class="tog-item">`+
+    `<div class="tog-btn ${cls}" id="${id}" onclick="${fn}">${icon}</div>`+
+    `<span class="tog-label" onclick="${fn}">${lbl}</span></div>`;
   document.getElementById("model-panel").innerHTML=
     `<div class="config-row">`+
     `<div class="config-row-label">Show</div>`+
@@ -426,16 +430,17 @@ function buildSourcesPanel(){
     `<div class="config-row">`+
     `<div class="config-row-label">Options</div>`+
     `<div class="config-icons-row">`+
-    ti("tog-weighted",e(useWeightedAvg),"⚖️","toggleWeighting(this)","Weighted")+
-    ti("tog-vert",e(verticalLayout),"⇅","toggleVertical(this)","Vertical")+
+    ti("tog-weighted",e(useWeightedAvg),"⚖️","toggleWeighting(document.getElementById('tog-weighted'))","Weighted")+
+    ti("tog-vert",e(verticalLayout),"⇅","toggleVertical(document.getElementById('tog-vert'))","Vertical")+
     `</div></div>`+
     `<div class="config-row">`+
     `<div class="config-row-label">Sources</div>`+
     `<div class="config-icons-row">`+
     MODELS.map(m=>
-      `<div class="tog-item" onclick="toggleModel('${m.key}')" title="${m.desc}">`+
-      `<div class="tog-btn enabled" id="toggle-${m.key}"><span class="mdot" style="background:${m.color}">${m.short}</span></div>`+
-      `<span class="tog-label">${m.label}</span></div>`
+      `<div class="tog-item">`+
+      `<div class="tog-btn enabled" id="toggle-${m.key}" onclick="toggleModel('${m.key}')" title="${m.desc}">`+
+      `<span class="mdot" style="background:${m.color}">${m.short}</span></div>`+
+      `<span class="tog-label" onclick="toggleModel('${m.key}')">${m.label}</span></div>`
     ).join("")+
     `</div></div>`;
 }
@@ -1167,6 +1172,7 @@ function renderVerticalHourly(){
     const nr=document.getElementById('now-row');
     if(wrap&&nr)wrap.scrollTop=Math.max(0,nr.offsetTop-wrap.offsetTop-40);
   });
+  positionNowOverlay();
 }
 
 function renderVerticalDaily(){
@@ -1259,6 +1265,38 @@ function renderVerticalDaily(){
 }
 
 
+function positionNowOverlay(){
+  requestAnimationFrame(()=>{
+    const wrap=document.getElementById('table-wrap');
+    if(!wrap)return;
+    // Horizontal view: vertical red line over now column
+    const nowTh=document.querySelector('.hour-header th.now-col');
+    const ovV=document.getElementById('now-overlay');
+    if(nowTh&&ovV&&!verticalLayout){
+      const wrapRect=wrap.getBoundingClientRect();
+      const thRect=nowTh.getBoundingClientRect();
+      // Position relative to the scrollable wrap content
+      const left=nowTh.offsetLeft+Math.floor(nowTh.offsetWidth/2);
+      ovV.style.left=left+'px';
+      ovV.style.display='block';
+      ovV.style.top='0';
+      ovV.style.bottom='0';
+    } else if(ovV){
+      ovV.style.display='none';
+    }
+    // Vertical view: horizontal red line over now row
+    const nowRow=document.getElementById('now-row');
+    const ovH=document.getElementById('now-overlay-h');
+    if(nowRow&&ovH&&verticalLayout){
+      const top=nowRow.offsetTop+Math.floor(nowRow.offsetHeight/2);
+      ovH.style.top=top+'px';
+      ovH.style.display='block';
+    } else if(ovH){
+      ovH.style.display='none';
+    }
+  });
+}
+
 function scrollToNow(){
   requestAnimationFrame(()=>{
     const wrap=document.querySelector('.table-wrap');
@@ -1309,6 +1347,9 @@ function renderHourly(){
   const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const ndCls=indices.map((i,ci)=>colDayCls(ref.time[i],ci>0?ref.time[indices[ci-1]]:null));
   const pastCls=indices.map(i=>(nowIdx>=0&&i<nowIdx)?'past-col':'');
+  // Build actMap here so buildCloudSection can access it
+  const actMap={};
+  if(actualData){actualData.hourly.time.forEach((t,ai)=>{actMap[t]=ai;});}
   const nowCi=indices.indexOf(nowIdx); // column position of 'now' within our slice
 
   const hdrCells=indices.map((i,ci)=>{
@@ -1404,6 +1445,7 @@ function renderHourly(){
     `)}
     ${secGroup("cloud",buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,ref,actMap))}`;
   scrollToNow();
+  positionNowOverlay();
 }
 
 // ══════════════════════════════════════════
@@ -1523,6 +1565,7 @@ function renderDaily(){
     const colW=nowTh.offsetWidth||72;
     wrap.scrollLeft=Math.max(0,nowTh.offsetLeft-labelW);
   });
+  positionNowOverlay();
 }
 
 
