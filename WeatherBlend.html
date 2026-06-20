@@ -80,7 +80,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 /* ── Sources panel ── */
 .model-panel{padding:8px 20px 10px;border-bottom:1px solid var(--border);background:var(--surface2);display:none;flex-direction:column;gap:2px;position:sticky;top:57px;z-index:90;}
 .model-panel.open{display:flex;}
-.config-row{display:flex;align-items:flex-start;gap:6px;width:100%;padding:4px 0;}
+.config-row{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:4px 0;}
 .config-row-label{font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:1px;text-transform:uppercase;width:100%;margin-bottom:3px;}
 .tog-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;min-width:44px;}
 .tog-item .tog-btn{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid var(--border);background:transparent;transition:all .15s;font-size:18px;}
@@ -89,6 +89,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .tog-item:hover .tog-btn:not(.disabled){border-color:var(--border2);opacity:1;}
 .tog-label{font-size:9px;color:var(--text-dim);text-align:center;white-space:nowrap;}
 .tog-item .tog-btn.enabled ~ .tog-label{color:var(--text-muted);}
+.config-icons-row{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;}
 .panel-label{font-size:13px;color:var(--text-dim);font-weight:700;letter-spacing:1px;text-transform:uppercase;}
 .model-toggle{display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:9px;border:1px solid var(--border);cursor:pointer;transition:all .15s;user-select:none;font-size:14px;}
 .model-toggle.enabled{border-color:var(--border2);background:var(--surface);}
@@ -110,8 +111,8 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:98px;max-width:98px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
 .hour-header th.row-label{background:var(--bg);z-index:15;}
 .hour-header th{padding:12px 6px 8px;font-size:14px;font-weight:500;color:var(--text-muted);text-align:center;background:var(--bg);position:sticky;top:0;z-index:10;min-width:64px;border-bottom:2px solid var(--border);}
-.hour-header th.now-col{color:var(--accent);border-bottom-color:var(--accent);border-left:2px solid var(--accent)!important;}
-.ftable td.now-col{border-left:2px solid var(--accent)!important;}
+.hour-header th.now-col{color:#ef4444;border-bottom-color:#ef4444;}
+.ftable th.now-col,.ftable td.now-col{border-left:2px dotted #ef4444!important;}
 
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
 .day-col{background:var(--day-bg)!important;}
@@ -203,7 +204,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .weight-badge.mid{color:#fbbf24;}
 .weight-badge.low{color:#f87171;}
 /* Actual data row */
-.now-row td{border-top:2px solid var(--accent)!important;border-bottom:2px solid var(--accent)!important;}
+.now-row td{border-top:2px dotted #ef4444!important;border-bottom:2px dotted #ef4444!important;}
 .past-col{opacity:0.60!important;}
 .actual-row td{text-align:center;padding:5px 3px;font-size:13px;color:var(--text-primary);border-top:1px dashed var(--border2);font-style:italic;}
 .actual-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;color:var(--text-muted);font-style:normal;}
@@ -413,24 +414,30 @@ function buildSourcesPanel(){
     `<div class="tog-btn ${cls}" id="${id}">${icon}</div>`+
     `<span class="tog-label">${lbl}</span></div>`;
   document.getElementById("model-panel").innerHTML=
-    `<div class="config-row"><div class="config-row-label">Show</div>`+
+    `<div class="config-row">`+
+    `<div class="config-row-label">Show</div>`+
+    `<div class="config-icons-row">`+
     ti("tog-temp",e(secVisible.temp),"🌡","toggleSection('temp',document.getElementById('tog-temp'))","Temp")+
     ti("tog-rain",e(secVisible.rain),"🌧","toggleSection('rain',document.getElementById('tog-rain'))","Rain")+
     ti("tog-wind",e(secVisible.wind),"💨","toggleSection('wind',document.getElementById('tog-wind'))","Wind")+
     ti("tog-cloud",e(secVisible.cloud),"☁️","toggleSection('cloud',document.getElementById('tog-cloud'))","Cloud")+
     ti("detail-in-panel",e(showDetail),"👁","toggleDetail()","Sources")+
-    `</div>`+
-    `<div class="config-row"><div class="config-row-label">Options</div>`+
+    `</div></div>`+
+    `<div class="config-row">`+
+    `<div class="config-row-label">Options</div>`+
+    `<div class="config-icons-row">`+
     ti("tog-weighted",e(useWeightedAvg),"⚖️","toggleWeighting(this)","Weighted")+
     ti("tog-vert",e(verticalLayout),"⇅","toggleVertical(this)","Vertical")+
-    `</div>`+
-    `<div class="config-row"><div class="config-row-label">Sources</div>`+
+    `</div></div>`+
+    `<div class="config-row">`+
+    `<div class="config-row-label">Sources</div>`+
+    `<div class="config-icons-row">`+
     MODELS.map(m=>
       `<div class="tog-item" onclick="toggleModel('${m.key}')" title="${m.desc}">`+
       `<div class="tog-btn enabled" id="toggle-${m.key}"><span class="mdot" style="background:${m.color}">${m.short}</span></div>`+
       `<span class="tog-label">${m.label}</span></div>`
     ).join("")+
-    `</div>`;
+    `</div></div>`;
 }
 
 function toggleSourcesPanel(){
@@ -984,11 +991,22 @@ function fmt(v,dp=1){return v==null?'<span class="empty">—</span>':v.toFixed(d
 function rainCls(v){if(!v||v<0.05)return'r0';if(v<0.2)return'r1';if(v<0.5)return'r2';if(v<1)return'r3';if(v<2)return'r4';if(v<5)return'r5';return'r6';}
 function windCls(v){if(!v||v<10)return'wc';if(v<20)return'wl';if(v<35)return'wm';if(v<55)return'wh';return'wx';}
 function cloudCls(v){if(v==null)return"";if(v<=12)return"cl0";if(v<=25)return"cl1";if(v<=50)return"cl2";if(v<=75)return"cl3";if(v<=87)return"cl4";return"cl5";}
-function buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled){
+function buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,ref,actMap){
   const avg=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,"cloudcover",indices)[ci]}))));
   const avgCells=avg.map((v,ci)=>{const cls=cloudCls(v);const nc=ci===nowCi?"now-col":"";const txt=v!=null?Math.round(v)+"%":"—";return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${txt}</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());}).join("");
   const srcRows=allActive.map(m=>{const v=hVals(m.key,"cloudcover",indices);const cells=v.map((x,ci)=>{const cls=cloudCls(x);const nc=ci===nowCi?"now-col":"";return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${x!=null?Math.round(x)+"%":"—"}</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());}).join("");return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span></span></td>${cells}</tr>`;}).join("");
-  return`<tr class="sec-head-temp"><td class="row-label" style="color:#c4b5fd">☁️ Cloud</td>${avgCells}</tr>${srcRows}`;
+  const nowMs=Date.now();
+  const actCells=actualData?indices.map((hourIdx,ci)=>{
+    if(new Date(ref.time[hourIdx]).getTime()>=nowMs)return'<td class="empty">–</td>';
+    const ai=actMap[ref.time[hourIdx]];
+    if(ai===undefined)return'<td class="empty">–</td>';
+    const v=actualData.hourly.cloudcover?.[ai];
+    if(v==null)return'<td class="empty">–</td>';
+    const cls=cloudCls(v);const nc=ci===nowCi?"now-col":"";
+    return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${Math.round(v)}%</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());
+  }).join(""):null;
+  return`<tr class="sec-head-temp"><td class="row-label" style="color:#c4b5fd">☁️ Cloud</td>${avgCells}</tr>${srcRows}`+
+    (actCells?`<tr class="actual-row"><td class="row-label" style="color:#c4b5fd">✓ Actual</td>${actCells}</tr>`:"");
 }
 function tempCls(v){if(v==null)return'';if(v<5)return'tc';if(v<12)return'tk';if(v<22)return'tm';if(v<30)return'tw';return'th';}
 function wxIcon(c){if(c==null)return'–';if(c===0)return'☀️';if(c<=2)return'⛅';if(c<=45)return'🌥️';if(c<=55)return'🌦️';if(c<=65)return'🌧️';if(c<=77)return'❄️';if(c<=82)return'🌧️';return'⛈️';}
@@ -1147,7 +1165,7 @@ function renderVerticalHourly(){
   requestAnimationFrame(()=>{
     const wrap=document.querySelector('.table-wrap');
     const nr=document.getElementById('now-row');
-    if(wrap&&nr)wrap.scrollTop=Math.max(0,nr.offsetTop-wrap.offsetTop-120);
+    if(wrap&&nr)wrap.scrollTop=Math.max(0,nr.offsetTop-wrap.offsetTop-40);
   });
 }
 
@@ -1384,7 +1402,7 @@ function renderHourly(){
       <tr class="sec-head-wind"><td class="row-label">💨 Wind</td>${avgWindCells}</tr>
       <tr class="data-row src-row"><td class="row-label" style="font-size:13px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
     `)}
-    ${secGroup("cloud",buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled))}`;
+    ${secGroup("cloud",buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,ref,actMap))}`;
   scrollToNow();
 }
 
