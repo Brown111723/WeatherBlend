@@ -106,9 +106,9 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 /* ── Table ── */
 .table-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);padding-bottom:40px;position:relative;}
-#now-overlay{position:absolute;top:0;height:100%;width:0;border-left:1px dotted #ef4444;pointer-events:none;z-index:11;display:none;}
-#past-overlay{position:absolute;top:0;left:0;width:0;height:100%;background:rgba(0,0,0,0.35);pointer-events:none;z-index:10;display:none;}
-#past-overlay-h{position:absolute;left:0;top:0;width:100%;height:0;background:rgba(0,0,0,0.35);pointer-events:none;z-index:10;display:none;}
+#now-overlay{position:absolute;top:0;height:100%;width:0;border-left:1px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
+#past-overlay{position:absolute;top:0;left:0;width:0;height:100%;background:rgba(0,0,0,0.35);pointer-events:none;z-index:19;display:none;}
+#past-overlay-h{position:absolute;left:0;top:0;width:100%;height:0;background:rgba(0,0,0,0.35);pointer-events:none;z-index:19;display:none;}
 /* Vertical layout z-index swap: date-header high, row-label low */
 .table-wrap.vertical-mode .row-label{z-index:8;}
 .table-wrap.vertical-mode .hour-header th{z-index:14;}
@@ -157,11 +157,12 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 .col-day{font-size:12px;color:var(--text-dim);display:block;margin-bottom:1px;}
 .col-time{display:block;}
-.sec-head-temp td,.sec-head-wind td,.sec-head-rain td,.sec-head-cloud td{text-align:center;padding:10px 4px 8px;font-size:15px;font-weight:600;color:var(--text-primary);border-bottom:2px solid var(--border2);}
+.sec-head-temp td,.sec-head-wind td,.sec-head-rain td{text-align:center;padding:10px 4px 8px;font-size:15px;font-weight:600;color:var(--text-primary);border-bottom:2px solid var(--border2);}
 .sec-head-temp td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#86efac;text-align:left!important;padding-left:20px!important;}
 .sec-head-wind td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#d9f99d;text-align:left!important;padding-left:20px!important;}
 .sec-head-rain td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#90caf9;text-align:left!important;padding-left:20px!important;}
-.sec-head-cloud td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#c4b5fd;text-align:left!important;padding-left:20px!important;}
+.sec-head-cloud td,.sec-head-cloud td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#c4b5fd;text-align:left!important;padding-left:20px!important;}
+.sec-head-cloud td{text-align:center;padding:10px 4px 8px;font-size:15px;font-weight:600;color:var(--text-primary);border-bottom:2px solid var(--border2);}
 .sec-head-temp .hilocell,.sec-head-rain .hilocell,.sec-head-wind .hilocell{font-size:12px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
 .icon-row td{text-align:center;padding:4px 3px;font-size:17px;}
 .data-row td{text-align:center;padding:6px 4px;font-size:15px;color:var(--text-primary);min-width:54px;}
@@ -469,21 +470,9 @@ function toggleSourcesPanel(){
 function toggleModel(key){
   if(autoHidden.has(key))return;
   const el=document.getElementById('toggle-'+key);
-  if(!el) return;
-  if(enabled.has(key)){
-    enabled.delete(key);
-    if(el.classList.contains('model-toggle')) el.className='model-toggle disabled';
-    else el.classList.remove('enabled'); el.classList.add('disabled');
-  }
-  else{
-    enabled.add(key);
-    if(el.classList.contains('model-toggle')) el.className='model-toggle enabled';
-    else el.classList.remove('disabled'); el.classList.add('enabled');
-  }
-  savePrefs(); 
-  if(Object.keys(state.data).length){
-    renderCurrentBar();renderTable();
-  }
+  if(enabled.has(key)){enabled.delete(key);el.className='model-toggle disabled';}
+  else{enabled.add(key);el.className='model-toggle enabled';}
+  savePrefs(); if(Object.keys(state.data).length){renderCurrentBar();renderTable();}
 }
 function toggleDetail(){
   showDetail=!showDetail; updateDetailBtn(); savePrefs();
@@ -834,15 +823,12 @@ function computeCurrentFromHourly(){
   }));
 
   // Rain recorded: sum ACTUAL precip from midnight today up to current hour
-  // Use table-populated actualData for accuracy
   let rainRecorded=0;
   if(actualData?.hourly?.time){
-    const nowMs = now.getTime();
     actualData.hourly.time.forEach((t,i)=>{
-      const tDate = new Date(t);
-      // Only today's hours, up to current time
-      if(t.slice(0,10)===todayStr && tDate.getTime() <= nowMs){
-        rainRecorded += (actualData.hourly.precipitation[i]||0);
+      // Only today's hours, and only up to/including now
+      if(t.slice(0,10)===todayStr && new Date(t)<=now){
+        rainRecorded+=(actualData.hourly.precipitation[i]||0);
       }
     });
   }
@@ -1286,7 +1272,7 @@ function buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,r
     const cls=cloudCls(v);const nc=ci===nowCi?"now-col":"";
     return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${Math.round(v)}%</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());
   }).join(""):null;
-  return`<tr class="sec-head-cloud"><td class="row-label" style="color:#c4b5fd">☁️ Cloud</td>${avgCells}</tr>${srcRows}`+
+  return`<tr class="sec-head-cloud"><td class="row-label">☁️ Cloud</td>${avgCells}</tr>${srcRows}`+
     (actCells?`<tr class="actual-row"><td class="row-label" style="color:#c4b5fd">✓ Actual</td>${actCells}</tr>`:"");
 }
 function tempCls(v){if(v==null)return'';if(v<5)return'tc';if(v<12)return'tk';if(v<22)return'tm';if(v<30)return'tw';return'th';}
@@ -1421,6 +1407,7 @@ function renderVertical_cellVal(colId,i,onlyEnabled,actMap,nowMs,ref){
       const v=ai!==undefined?actualData.hourly.precipitation?.[ai]:null;
       return`<td class="${v!=null?rainCls(v):''}">${v!=null?(v<0.05?'<span class="empty">0</span>':v.toFixed(1)):'–'}</td>`;
     }
+    case'cloud':{const v=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.cloudcover?.[i]??null})));return`<td class="${cloudCls(v)}">${v!=null?Math.round(v)+'%':'—'}</td>`;}
     case'cloud':{
       const v=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.cloudcover?.[i]??null})));
       return`<td class="${cloudCls(v)}">${v!=null?Math.round(v)+'%':'—'}</td>`;
