@@ -106,7 +106,9 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 /* ── Table ── */
 .table-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);padding-bottom:40px;position:relative;}
-#now-overlay{position:absolute;top:0;height:100%;width:0;border-left:1px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
+#now-overlay{position:absolute;top:0;height:100%;width:0;border-left:1px dotted #ef4444;pointer-events:none;z-index:19;display:none;}
+#past-overlay{position:absolute;top:0;left:0;width:0;height:100%;background:rgba(0,0,0,0.35);pointer-events:none;z-index:18;display:none;}
+#past-overlay-h{position:absolute;left:0;top:0;width:100%;height:0;background:rgba(0,0,0,0.35);pointer-events:none;z-index:18;display:none;}
 #now-overlay-h{position:absolute;left:0;width:100%;height:0;border-top:1px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
 .ftable{width:100%;border-collapse:separate;border-spacing:0;font-family:'JetBrains Mono',monospace;}
 .ftable th,.ftable td{white-space:nowrap;}
@@ -208,7 +210,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .weight-badge.low{color:#f87171;}
 /* Actual data row */
 .now-row td{}
-.past-col{opacity:0.60!important;}
+.past-col{}/* past dimming now done by overlay */
 .actual-row td{text-align:center;padding:5px 3px;font-size:13px;color:var(--text-primary);border-top:1px dashed var(--border2);font-style:italic;}
 .actual-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;color:var(--text-muted);font-style:normal;}
 .err-banner{margin:10px 20px;padding:12px 16px;background:#2a1010;border:1px solid #5a1a1a;border-radius:8px;color:#f87171;font-size:15px;}
@@ -358,6 +360,8 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 <div class="table-wrap" id="table-wrap" onscroll="positionNowOverlay()">
   <div id="now-overlay"></div>
   <div id="now-overlay-h"></div>
+  <div id="past-overlay"></div>
+  <div id="past-overlay-h"></div>
   <table class="ftable"><tbody id="tbody">
     <tr><td style="padding:40px 20px;color:var(--text-muted)"><span class="sk" style="width:180px;height:14px"></span></td></tr>
   </tbody></table>
@@ -1159,7 +1163,7 @@ function renderVerticalHourly(){
     const isDayStart=i>0&&ref.time[i].slice(0,10)!==ref.time[i-1].slice(0,10);
     const rowStyle=isDayStart?'border-top:2px solid var(--day-line)':'';
     const cells=cols.map(c=>renderVertical_cellVal(c.id,i,onlyEnabled,actMap,nowMs,ref)).join('');
-    const labelStyle=`font-family:'Inter',sans-serif;font-size:13px;white-space:nowrap;${isNow?'color:var(--accent);font-weight:700':''}`;
+    const labelStyle=`font-family:'Inter',sans-serif;font-size:13px;white-space:nowrap;${isNow?'color:#ef4444;font-weight:700':''}`;
     return`<tr class="data-row ${ndCls}${isNow?' now-row':''}" ${isNow?'id="now-row"':''} style="${rowStyle}">
       <td class="row-label ${ndCls}" style="${labelStyle}">${DAYS[d.getDay()]} ${d.getDate()} <span style="opacity:.7">${fmtAmPm(d)}</span></td>
       ${cells}
@@ -1171,7 +1175,7 @@ function renderVerticalHourly(){
   requestAnimationFrame(()=>{
     const wrap=document.querySelector('.table-wrap');
     const nr=document.getElementById('now-row');
-    if(wrap&&nr)wrap.scrollTop=Math.max(0,nr.offsetTop-wrap.offsetTop-40);
+    if(wrap&&nr)wrap.scrollTop=Math.max(0,nr.offsetTop-80);
   });
   positionNowOverlay();
 }
@@ -1270,28 +1274,67 @@ function positionNowOverlay(){
   requestAnimationFrame(()=>{
     const wrap=document.getElementById('table-wrap');
     if(!wrap)return;
-    const ovV=document.getElementById('now-overlay');
-    const ovH=document.getElementById('now-overlay-h');
+    const ovV   =document.getElementById('now-overlay');
+    const ovH   =document.getElementById('now-overlay-h');
+    const pastV =document.getElementById('past-overlay');
+    const pastH =document.getElementById('past-overlay-h');
+
+    // Measure sticky header height so overlays start below it
+    const hdrTh=wrap.querySelector('.hour-header th');
+    const hdrH=hdrTh?hdrTh.offsetTop+hdrTh.offsetHeight:0;
+
     if(!verticalLayout){
-      // Horizontal: vertical line at LEFT EDGE of now column
-      const nowTh=document.querySelector('.hour-header th.now-col');
+      // ── HORIZONTAL VIEW ──
+      const nowTh=wrap.querySelector('.hour-header th.now-col');
       if(nowTh&&ovV){
-        ovV.style.left=nowTh.offsetLeft+'px';
-        ovV.style.top='0';
-        ovV.style.height=wrap.scrollHeight+'px';
+        const leftEdge=nowTh.offsetLeft;
+        const totalH=wrap.scrollHeight;
+        const contentH=totalH-hdrH;
+
+        // Red dotted line: starts below header, full content height
+        ovV.style.left=leftEdge+'px';
+        ovV.style.top=hdrH+'px';
+        ovV.style.height=contentH+'px';
         ovV.style.display='block';
-      } else if(ovV){ovV.style.display='none';}
+
+        // Dark past overlay: from sticky label width to left edge of now col, below header
+        const labelW=98; // sticky row-label width
+        pastV.style.left=labelW+'px';
+        pastV.style.top=hdrH+'px';
+        pastV.style.width=Math.max(0,leftEdge-labelW)+'px';
+        pastV.style.height=contentH+'px';
+        pastV.style.display='block';
+      } else {
+        if(ovV)ovV.style.display='none';
+        if(pastV)pastV.style.display='none';
+      }
       if(ovH)ovH.style.display='none';
+      if(pastH)pastH.style.display='none';
     } else {
-      // Vertical: horizontal line at TOP EDGE of now row
+      // ── VERTICAL VIEW ──
       const nowRow=document.getElementById('now-row');
       if(nowRow&&ovH){
-        ovH.style.top=nowRow.offsetTop+'px';
+        const topEdge=nowRow.offsetTop;
+        const totalW=wrap.scrollWidth;
+
+        // Red dotted line: left of label col to full width, at top of now row
+        ovH.style.top=topEdge+'px';
         ovH.style.left='0';
-        ovH.style.width=wrap.scrollWidth+'px';
+        ovH.style.width=totalW+'px';
         ovH.style.display='block';
-      } else if(ovH){ovH.style.display='none';}
+
+        // Dark past overlay: from header bottom to top of now row
+        pastH.style.top=hdrH+'px';
+        pastH.style.left='0';
+        pastH.style.width=totalW+'px';
+        pastH.style.height=Math.max(0,topEdge-hdrH)+'px';
+        pastH.style.display='block';
+      } else {
+        if(ovH)ovH.style.display='none';
+        if(pastH)pastH.style.display='none';
+      }
       if(ovV)ovV.style.display='none';
+      if(pastV)pastV.style.display='none';
     }
   });
 }
