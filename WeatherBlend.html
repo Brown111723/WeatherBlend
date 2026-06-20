@@ -122,28 +122,38 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .hour-header th.now-col{color:#ef4444;}
 .hour-header th.now-col .col-day,.hour-header th.now-col .col-time{color:#ef4444!important;}
 
-
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
 .day-col{background:var(--day-bg)!important;}
 .day-start{border-left:2px solid var(--day-line)!important;}
 /* coloured cells in day columns */
-.day-col.r0{background:color-mix(in srgb,var(--day-bg) 100%,transparent)!important;}
-.day-col.r1{background:color-mix(in srgb,#0d2540 80%,#1a2a10 20%)!important;}
-.day-col.r2{background:color-mix(in srgb,#0d3a5c 80%,#1a2a10 20%)!important;}
-.day-col.r3{background:color-mix(in srgb,#0f4c8a 80%,#1a2a10 20%)!important;}
-.day-col.r4{background:color-mix(in srgb,#1565c0 80%,#1a2a10 20%)!important;}
-.day-col.r5{background:color-mix(in srgb,#1976d2 80%,#1a2a10 20%)!important;}
-.day-col.r6{background:color-mix(in srgb,#0d47a1 80%,#1a2a10 20%)!important;}
-.day-col.tc{background:color-mix(in srgb,#0d1a2e 80%,#1a2a10 20%)!important;}
-.day-col.tk{background:color-mix(in srgb,#0d2040 80%,#1a2a10 20%)!important;}
-.day-col.tm{background:color-mix(in srgb,#0d2e1a 80%,#1a2a10 20%)!important;}
-.day-col.tw{background:color-mix(in srgb,#2e2000 80%,#1a2a10 20%)!important;}
-.day-col.th{background:color-mix(in srgb,#3a1000 80%,#1a2a10 20%)!important;}
-.day-col.wc{background:color-mix(in srgb,#0a1a0f 80%,#1a2a10 20%)!important;}
-.day-col.wl{background:color-mix(in srgb,#0d2215 80%,#1a2a10 20%)!important;}
-.day-col.wm{background:color-mix(in srgb,#2a3a0a 80%,#1a2a10 20%)!important;}
-.day-col.wh{background:color-mix(in srgb,#3a2a0a 80%,#1a2a10 20%)!important;}
-.day-col.wx{background:color-mix(in srgb,#4a1a0a 80%,#1a2a10 20%)!important;}
+.day-col/* ── Consistent metric color scheme ── */
+/* Temperature: cool blue → warm red, bg tint + text */
+.tc{background:rgba(56,135,255,0.16)!important;color:#7eb3ff!important;}
+.tk{background:rgba(56,189,248,0.14)!important;color:#7dd3fc!important;}
+.tm{background:rgba(134,239,172,0.13)!important;color:#86efac!important;}
+.tw{background:rgba(251,191,36,0.15)!important;color:#fcd34d!important;}
+.th{background:rgba(248,113,113,0.18)!important;color:#fca5a5!important;}
+/* Rain: graduated blue (heading #90caf9) */
+.r0{background:transparent!important;color:var(--text-muted)!important;}
+.r1{background:rgba(144,202,249,0.10)!important;color:#90caf9!important;}
+.r2{background:rgba(144,202,249,0.18)!important;color:#a8d3fb!important;}
+.r3{background:rgba(100,181,246,0.26)!important;color:#bbdefb!important;}
+.r4{background:rgba(66,165,245,0.34)!important;color:#c8e4fc!important;}
+.r5{background:rgba(33,150,243,0.42)!important;color:#dcebfd!important;}
+.r6{background:rgba(13,110,253,0.52)!important;color:#e3f2fd!important;}
+/* Wind: graduated lime→amber→red (heading #d9f99d) */
+.wc{background:transparent!important;color:var(--text-muted)!important;}
+.wl{background:rgba(217,249,157,0.12)!important;color:#d9f99d!important;}
+.wm{background:rgba(190,242,100,0.20)!important;color:#bef264!important;}
+.wh{background:rgba(251,191,36,0.24)!important;color:#fcd34d!important;}
+.wx{background:rgba(248,113,113,0.30)!important;color:#fca5a5!important;}
+/* Cloud: clear green → cloudy purple → overcast grey (heading #c4b5fd) */
+.cl0{background:transparent!important;color:#86efac!important;}
+.cl1{background:rgba(147,197,253,0.10)!important;color:#93c5fd!important;}
+.cl2{background:rgba(196,181,253,0.16)!important;color:#c4b5fd!important;}
+.cl3{background:rgba(167,162,192,0.20)!important;color:#b8b3cc!important;}
+.cl4{background:rgba(120,113,108,0.22)!important;color:#a8a29e!important;}
+.cl5{background:rgba(87,83,78,0.28)!important;color:#94908c!important;}
 
 .col-day{font-size:12px;color:var(--text-dim);display:block;margin-bottom:1px;}
 .col-time{display:block;}
@@ -164,12 +174,6 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .spacer td{height:18px;}
 .empty{color:var(--text-dim)!important;font-size:13px;}
 
-.cl0{background:#0a1a12;color:#4ade80!important;}
-.cl1{background:#161a22;color:#93c5fd!important;}
-.cl2{background:#1e2030;color:#c4b5fd!important;}
-.cl3{background:#252530;color:#a8a3c0!important;}
-.cl4{background:#202025;color:#78716c!important;}
-.cl5{background:#1a1a1a;color:#57534e!important;}
 /* Rain */
 .r0{color:var(--text-dim)!important;}.r1{background:#0d2540;color:#7bb8f0!important;}.r2{background:#0d3a5c;color:#90caf9!important;}.r3{background:#0f4c8a;color:#bbdefb!important;}.r4{background:#1565c0;color:#e3f2fd!important;}.r5{background:#1976d2;color:#fff!important;}.r6{background:#0d47a1;color:#fff!important;font-weight:700;}
 /* Wind */
@@ -249,11 +253,10 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
   </div>
   <div class="curr-divider"></div>
   <div class="curr-block">
-    <div class="curr-lbl">Rain today <span style="font-size:8px;opacity:.6">(model)</span></div>
-    <div class="curr-sub" style="margin-top:2px" id="curr-recorded-lbl">Recorded:</div>
-    <div class="curr-val" id="curr-today-rain" style="font-size:14px">–</div>
-    <div class="curr-sub" id="curr-exp-lbl2">Expected:</div>
-    <div class="curr-val" id="curr-today-exp" style="font-size:14px">–</div>
+    <div class="curr-lbl">Rain today</div>
+    <div class="curr-val" id="curr-today-total" style="font-size:20px;color:#90caf9">–</div>
+    <div class="curr-sub" style="margin-top:3px"><span style="color:#86efac">Actual:</span> <span id="curr-today-rain">–</span></div>
+    <div class="curr-sub"><span style="opacity:.7">Forecast:</span> <span id="curr-today-exp">–</span></div>
   </div>
 
   <div class="curr-divider"></div>
@@ -362,8 +365,6 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 </div>
 <div id="err-area"></div>
 
-
-
 <div class="table-wrap" id="table-wrap" onscroll="positionNowOverlay()">
   <div id="now-overlay"></div>
   <div id="now-overlay-h"></div>
@@ -419,6 +420,8 @@ const AUTO_MS = 60*60*1000;
 // ══════════════════════════════════════════
 window.addEventListener('DOMContentLoaded',()=>{
   loadPrefs();
+  // sync active view button to restored view
+  document.querySelectorAll('#view-btns .btn').forEach(b=>{const mm=b.getAttribute('onclick')?.match(/'([^']+)'/);if(mm)b.classList.toggle('active',mm[1]===state.view);});
   buildSourcesPanel();
   updateDetailBtn();
   getLocation();
@@ -597,6 +600,7 @@ function loadPrefs(){
     if(p.verticalLayout!==undefined)verticalLayout=p.verticalLayout;
     if(p.secVisible)Object.assign(secVisible,p.secVisible);
     if(p.enabled){enabled.clear();p.enabled.forEach(k=>{if(MODELS.find(m=>m.key===k))enabled.add(k);});}
+    if(p.view)state.view=p.view;
   }catch(e){}
 }
 function saveLocation(lat,lon,name){
@@ -790,7 +794,14 @@ function renderCurrentBar(){
   // Rain today: measured since midnight + expected rest of day
   const past=precipHourly.slice(0,precipHourly.length-1);
   const hourOfDay=new Date().getHours();
-  const measuredToday=past.slice(Math.max(0,past.length-hourOfDay)).reduce((a,v)=>a+(v||0),0);
+  // Measured today from Google actuals (sum precip for today's past hours)
+  let measuredToday=0;
+  if(actualData?.hourly?.time){
+    const todayStr=new Date().toISOString().slice(0,10);
+    actualData.hourly.time.forEach((t,i)=>{
+      if(t.slice(0,10)===todayStr){measuredToday+=(actualData.hourly.precipitation[i]||0);}
+    });
+  }
   const hoursLeftToday=Math.max(0,23-hourOfDay);
   const expectedToday=cachedForecastRain
     ?cachedForecastRain.slice(0,hoursLeftToday).reduce((a,v)=>a+(v||0),0)
@@ -806,17 +817,22 @@ function renderCurrentBar(){
   document.getElementById('curr-icon').textContent=wxIcon(c.weathercode);
   document.getElementById('curr-temp').textContent=`${Math.round(c.temperature_2m)}°`;
   document.getElementById('curr-hilo').textContent=
-    todayHi!=null?`↑${Math.round(todayHi)}° ↓${todayLo!=null?Math.round(todayLo)+'°':'—'}`:'' ;
+    todayHi!=null?`↑${Math.round(todayHi)}° ↓${todayLo!=null?Math.round(todayLo)+'°':'—'}`:'—';
   document.getElementById('curr-date').textContent=new Date().toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('curr-feels').textContent=`Feels ${Math.round(c.apparent_temperature)}°`;
   document.getElementById('curr-synopsis').textContent=briefSynopsis(c);
 
   // Rain today: total value + "x.x + x.x" sub-line
-  // Today rain — Recorded and Expected separately
-  const todayEl=document.getElementById('curr-today-rain');
+  // Today rain — Total (Actual + Forecast). Forecast respects weighted/avg toggle.
+  const todayActEl=document.getElementById('curr-today-rain');
   const todayExpEl=document.getElementById('curr-today-exp');
-  if(todayEl) todayEl.textContent=measuredToday.toFixed(1)+' mm';
-  if(todayExpEl) todayExpEl.textContent=(expectedToday!=null?expectedToday.toFixed(1):'–')+' mm';
+  const todayTotEl=document.getElementById('curr-today-total');
+  const actMm=measuredToday;
+  const expMm=expectedToday!=null?expectedToday:0;
+  const totMm=actMm+expMm;
+  if(todayActEl) todayActEl.textContent=actMm.toFixed(1)+' mm';
+  if(todayExpEl) todayExpEl.textContent=expMm.toFixed(1)+' mm';
+  if(todayTotEl) todayTotEl.textContent=totMm.toFixed(1)+' mm';
 
   document.getElementById('curr-wind').textContent=`${Math.round(c.windspeed_10m)} km/h · ${windWord(c.windspeed_10m)}`;
   document.getElementById('curr-winddir').textContent=`${windArrow} ${dirFull(c.winddirection_10m)}`;
@@ -861,7 +877,6 @@ function isDay(tsMs,dateStr){
   return tsMs>=s.riseMs&&tsMs<s.setMs;
 }
 function isDayStart(iso,prevIso){return prevIso&&iso.slice(0,10)!==prevIso.slice(0,10);}
-
 
 // ══════════════════════════════════════════
 // GOOGLE WEATHER — forecast source + today's actuals
@@ -987,6 +1002,54 @@ async function fetchGoogleTodayActuals(){
   }
 }
 
+// Fetch Google 24h history → populate actualData for display (Google only)
+async function fetchGoogleActualsFull(){
+  try{
+    const lat=state.lat, lon=state.lon;
+    const r=await fetch(GOOG_BASE+'/history/hours:lookup?key='+GOOG_KEY
+      +'&location.latitude='+lat+'&location.longitude='+lon+'&hours=24&pageSize=24');
+    if(!r.ok)throw new Error('GOOG hist HTTP '+r.status);
+    const j=await r.json();
+    if(!j.historyHours?.length){console.warn('Google history empty');return;}
+    const nowMs=Date.now();
+    const rows=[];
+    for(const h of j.historyHours){
+      const t=googTimeToLocal(h.interval?.startTime);
+      if(new Date(t).getTime()>nowMs)continue;
+      rows.push({
+        t,
+        temp:h.temperature?.degrees??null,
+        precip:h.precipitation?.qpf?.quantity??0,
+        cloud:h.cloudCover??null
+      });
+    }
+    rows.sort((a,b)=>a.t.localeCompare(b.t));
+    actualData.hourly.time=rows.map(r=>r.t);
+    actualData.hourly.temperature_2m=rows.map(r=>r.temp);
+    actualData.hourly.precipitation=rows.map(r=>r.precip);
+    actualData.hourly.cloudcover=rows.map(r=>r.cloud);
+    // Daily actuals: aggregate today from the hours
+    const byDate={};
+    for(const r of rows){
+      const d=r.t.slice(0,10);
+      if(!byDate[d])byDate[d]={temps:[],precip:0};
+      if(r.temp!=null)byDate[d].temps.push(r.temp);
+      byDate[d].precip+=(r.precip||0);
+    }
+    actualData.daily.time=[];actualData.daily.temperature_2m_max=[];
+    actualData.daily.temperature_2m_min=[];actualData.daily.precipitation_sum=[];
+    for(const d of Object.keys(byDate).sort()){
+      actualData.daily.time.push(d);
+      const ts=byDate[d].temps;
+      actualData.daily.temperature_2m_max.push(ts.length?Math.max(...ts):null);
+      actualData.daily.temperature_2m_min.push(ts.length?Math.min(...ts):null);
+      actualData.daily.precipitation_sum.push(byDate[d].precip);
+    }
+    console.log('Google actuals loaded:',rows.length,'hours, last:',rows[rows.length-1]?.t);
+  }catch(e){
+    console.warn('Google actuals failed:',e.message);
+  }
+}
 
 // ══════════════════════════════════════════
 // HISTORICAL ACTUALS + MODEL WEIGHT CALC
@@ -1014,8 +1077,11 @@ async function fetchActualsAndComputeWeights(){
     if(!res.ok)throw new Error(`Historical API ${res.status}`);
     const json=await res.json();
     if(json.error)throw new Error(json.reason);
-    actualData=json;
-    await fetchGoogleTodayActuals();
+    // Keep OM data for weight computation (needs 7 days of overlap)
+    const omForWeights=json;
+    // But DISPLAY only Google actuals for consistency
+    actualData={hourly:{time:[],temperature_2m:[],precipitation:[],cloudcover:[]},daily:{time:[],temperature_2m_max:[],temperature_2m_min:[],precipitation_sum:[]},_omWeights:omForWeights};
+    await fetchGoogleActualsFull();
 
     const activeMods=activeEnabled();
     if(!activeMods.length)return;
@@ -1203,7 +1269,6 @@ function setView(v,el){
   if(Object.keys(state.data).length)renderTable(); // instant table re-render
 }
 
-
 // ══════════════════════════════════════════
 // VERTICAL LAYOUT — time as rows, metrics as cols
 // Supports 1h/3h/8h and Daily timeframes
@@ -1378,14 +1443,14 @@ function renderVerticalDaily(){
           const hi=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.daily?.temperature_2m_max?.[i]??null})));
           const lo=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.daily?.temperature_2m_min?.[i]??null})));
           const cls=hi!=null?tempCls(hi):'', loCls=lo!=null?tempCls(lo):'';
-          return`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'—'} <span class="${loCls}" style="font-size:11px">↓${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;
+          return (hi==null&&lo==null)?`<td class="${cls}"><span class="empty">—</span></td>`:`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'—'} <span class="${loCls}" style="font-size:11px">↓${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;
         }
         case'act_t':{
           if(!isPast||ai===undefined)return'<td class="empty">–</td>';
           const hi=actualData.daily.temperature_2m_max?.[ai];
           const lo=actualData.daily.temperature_2m_min?.[ai];
           const cls=hi!=null?tempCls(hi):'', loCls=lo!=null?tempCls(lo):'';
-          return`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'–'} <span class="${loCls}" style="font-size:11px">↓${lo!=null?lo.toFixed(0)+'°':'–'}</span></td>`;
+          return (hi==null&&lo==null)?`<td class="${cls}"><span class="empty">—</span></td>`:`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'–'} <span class="${loCls}" style="font-size:11px">↓${lo!=null?lo.toFixed(0)+'°':'–'}</span></td>`;
         }
         case'rain_sum':{
           const v=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.daily?.precipitation_sum?.[i]??null})));
@@ -1416,7 +1481,6 @@ function renderVerticalDaily(){
     if(wrap&&nr)wrap.scrollTop=Math.max(0,nr.offsetTop-wrap.offsetTop-380);
   });
 }
-
 
 function positionNowOverlay(){
   requestAnimationFrame(()=>{
@@ -1526,8 +1590,6 @@ function renderHourly(){
   for(let i=si;i<ref.time.length&&i<si+20*24;i+=step)raw.push(i);
   const indices=raw.slice(0,state.view==='1h'?20*24:state.view==='3h'?Math.ceil(20*24/3):Math.ceil(20*24/8));
 
-
-
   const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const ndCls=indices.map((i,ci)=>colDayCls(ref.time[i],ci>0?ref.time[indices[ci-1]]:null));
   const pastCls=indices.map(i=>(nowIdx>=0&&i<nowIdx)?'past-col':'');
@@ -1580,7 +1642,6 @@ function renderHourly(){
 
   const iconKey=onlyEnabled[0]?.key||allActive[0]?.key;
   const iconCells=hVals(iconKey,'weathercode',indices).map((c,ci)=>{const nc=ci===nowCi?'now-col':'';return injectColCls(`<td class="${[pastCls[ci]||'',nc].filter(Boolean).join(' ')}">${wxIcon(c)}</td>`,ndCls[ci]);}).join('');
-
 
   // ── Actual (ERA5) data rows ──
   function buildActualCells(field, indices, fmtFn, clsFn, nowCiRef){
@@ -1669,7 +1730,7 @@ function renderDaily(){
     const mx=dVals(m.key,'temperature_2m_max'),mn=dVals(m.key,'temperature_2m_min');
     const cells=mx.map((hi,ci)=>{
       const lo=mn[ci],cls=hi!=null?tempCls(hi):'',loCls=lo!=null?tempCls(lo):'';
-      return`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'—'} <span class="${loCls}" style="font-size:13px">↓${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;
+      return (hi==null&&lo==null)?`<td class="${cls}"><span class="empty">—</span></td>`:`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'—'} <span class="${loCls}" style="font-size:13px">↓${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;
     }).join('');
     return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:10px;color:var(--text-muted)">${(()=>{const w=modelWeights[m.key];if(!w)return '';const pct=Math.round(w*100);const cls=pct>=20?'high':pct>=10?'mid':'low';return '<span class="weight-badge '+cls+'">'+pct+'%</span>';})()}</span></span></td>${cells}</tr>`;
   }).join('');
@@ -1678,7 +1739,7 @@ function renderDaily(){
   const avgTempCells=avgMax.map((hi,ci)=>{
     const lo=avgMin[ci],cls=hi!=null?tempCls(hi):'';
     const loCls=lo!=null?tempCls(lo):'';
-    return`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'—'} <span class="${loCls}" style="font-size:13px">↓${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;
+    return (hi==null&&lo==null)?`<td class="${cls}"><span class="empty">—</span></td>`:`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'—'} <span class="${loCls}" style="font-size:13px">↓${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;
   }).join('');
 
   // Actual daily temp — from Historical Forecast API daily data
@@ -1691,7 +1752,7 @@ function renderDaily(){
     const hi=actualData.daily.temperature_2m_max?.[ai];
     const lo=actualData.daily.temperature_2m_min?.[ai];
     const cls=hi!=null?tempCls(hi):'',loCls=lo!=null?tempCls(lo):'';
-    return`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'–'} <span class="${loCls}" style="font-size:13px">↓${lo!=null?lo.toFixed(0)+'°':'–'}</span></td>`;
+    return (hi==null&&lo==null)?`<td class="${cls}"><span class="empty">—</span></td>`:`<td class="${cls}">↑${hi!=null?hi.toFixed(0)+'°':'–'} <span class="${loCls}" style="font-size:13px">↓${lo!=null?lo.toFixed(0)+'°':'–'}</span></td>`;
   }).join('');
 
   // ── WIND ──
@@ -1752,7 +1813,6 @@ function renderDaily(){
   });
   positionNowOverlay();
 }
-
 
 // ══════════════════════════════════════════
 // UI HELPERS
