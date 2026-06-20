@@ -95,14 +95,14 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .lsw{width:11px;height:7px;border-radius:2px;display:inline-block;vertical-align:middle;}
 
 /* ── Table ── */
-.table-wrap{overflow-x:auto;padding-bottom:40px;}
+.table-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);padding-bottom:40px;}
 .ftable{width:100%;border-collapse:separate;border-spacing:0;font-family:'JetBrains Mono',monospace;}
 .ftable th,.ftable td{white-space:nowrap;}
 .row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:98px;max-width:98px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
 .hour-header th.row-label{background:var(--bg);z-index:15;}
 .hour-header th{padding:12px 6px 8px;font-size:14px;font-weight:500;color:var(--text-muted);text-align:center;background:var(--bg);position:sticky;top:0;z-index:10;min-width:64px;border-bottom:2px solid var(--border);}
 .hour-header th.now-col{color:var(--accent);border-bottom-color:var(--accent);border-left:2px solid var(--accent)!important;}
-.ftable td.now-col{border-left:2px solid rgba(59,130,246,0.3)!important;}
+.ftable td.now-col{border-left:2px solid var(--accent)!important;}
 
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
 .day-col{background:var(--day-bg)!important;}
@@ -189,7 +189,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .weight-badge.low{color:#f87171;}
 /* Actual data row */
 .now-row td{border-top:2px solid var(--accent)!important;border-bottom:2px solid var(--accent)!important;}
-.past-col{opacity:0.65!important;}
+.past-col{opacity:0.42!important;}
 .actual-row td{text-align:center;padding:5px 3px;font-size:13px;color:var(--text-primary);border-top:1px dashed var(--border2);font-style:italic;}
 .actual-row td.row-label{font-family:'Inter',sans-serif;font-size:11px;color:var(--text-muted);font-style:normal;}
 .err-banner{margin:10px 20px;padding:12px 16px;background:#2a1010;border:1px solid #5a1a1a;border-radius:8px;color:#f87171;font-size:15px;}
@@ -1079,7 +1079,8 @@ function renderVerticalHourly(){
   const step=state.view==='1h'?1:state.view==='3h'?3:8;
   const tenDaysAgo=new Date(now.getTime()-10*24*3600*1000);
   let si=ref.time.findIndex(t=>new Date(t)>=tenDaysAgo);if(si<0)si=0;
-  const nowIdx=ref.time.findIndex(t=>new Date(t)>=now);
+  const // nowIdx: find current hour slot (last hour whose time <= now)
+  nowIdx=(()=>{let idx=0;for(let k=0;k<ref.time.length;k++){if(new Date(ref.time[k])<=now)idx=k;else break;}return idx;})();
   const raw=[];
   for(let i=si;i<ref.time.length&&i<si+20*24;i+=step)raw.push(i);
   const indices=raw.slice(0,state.view==='1h'?20*24:Math.ceil(20*24/step));
@@ -1245,7 +1246,8 @@ function renderHourly(){
   const sevenDaysAgo=new Date(now.getTime()-10*24*3600*1000);
   let si=ref.time.findIndex(t=>new Date(t)>=sevenDaysAgo);if(si<0)si=0;
   // Find "now" index for highlighting
-  const nowIdx=ref.time.findIndex(t=>new Date(t)>=now);
+  const // nowIdx: find current hour slot (last hour whose time <= now)
+  nowIdx=(()=>{let idx=0;for(let k=0;k<ref.time.length;k++){if(new Date(ref.time[k])<=now)idx=k;else break;}return idx;})();
   const raw=[];
   for(let i=si;i<ref.time.length&&i<si+20*24;i+=step)raw.push(i);
   const indices=raw.slice(0,state.view==='1h'?20*24:state.view==='3h'?Math.ceil(20*24/3):Math.ceil(20*24/8));
@@ -1255,6 +1257,7 @@ function renderHourly(){
   const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const ndCls=indices.map((i,ci)=>colDayCls(ref.time[i],ci>0?ref.time[indices[ci-1]]:null));
   const pastCls=indices.map(i=>(nowIdx>=0&&i<nowIdx)?'past-col':'');
+  const nowCi=indices.indexOf(nowIdx); // column position of 'now' within our slice
 
   const hdrCells=indices.map((i,ci)=>{
     const d=new Date(ref.time[i]);
@@ -1272,20 +1275,20 @@ function renderHourly(){
   // ── TEMP ──
   const tempModelRows=allActive.map(m=>{
     const v=hVals(m.key,'temperature_2m',indices);
-    const cells=v.map((x,ci)=>injectColCls(`<td class="${x!=null?tempCls(x):''}">${x!=null?x.toFixed(0)+'°':'—'}</td>`,ndCls[ci])).join('');
+    const cells=v.map((x,ci)=>{const nc=ci===nowCi?'now-col':'';return injectColCls(`<td class="${[x!=null?tempCls(x):'',nc].filter(Boolean).join(' ')}">${x!=null?x.toFixed(0)+'°':'—'}</td>`,ndCls[ci]);}).join('');
     return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:10px;color:var(--text-muted)">${(()=>{const w=modelWeights[m.key];if(!w)return '';const pct=Math.round(w*100);const cls=pct>=20?'high':pct>=10?'mid':'low';return '<span class="weight-badge '+cls+'">'+pct+'%</span>';})()}</span></span></td>${cells}</tr>`;
   }).join('');
   const avgTemp=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,'temperature_2m',indices)[ci]}))));
   const avgTempCells=avgTemp.map((v,ci)=>{
     const cls=v!=null?tempCls(v):'';
-    return injectColCls(`<td class="${cls}">${fmt(v,0)}°</td>`,(ndCls[ci]+' '+pastCls[ci]).trim());
+    const nc=ci===nowCi?'now-col':''; return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(' ')}">${fmt(v,0)}°</td>`,(ndCls[ci]+' '+pastCls[ci]).trim());
   }).join('');
 
   // ── WIND ──
   const avgWind=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,'windspeed_10m',indices)[ci]}))));
-  const avgWindCells=avgWind.map((v,ci)=>injectColCls(`<td class="${(v!=null?windCls(v):'')+' '+(pastCls[ci]||'')}">${fmt(v,0)}</td>`,ndCls[ci])).join('');
+  const avgWindCells=avgWind.map((v,ci)=>{const nc=ci===nowCi?'now-col':'';return injectColCls(`<td class="${[v!=null?windCls(v):'',pastCls[ci]||'',nc].filter(Boolean).join(' ')}">${fmt(v,0)}</td>`,ndCls[ci]);}).join('');
   const avgDir=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:hVals(m.key,'winddirection_10m',indices)[ci]}))));
-  const avgDirCells=avgDir.map((v,ci)=>injectColCls(`<td class="dir-cell ${pastCls[ci]||''}">${v!=null?dirArrow(v):'—'}</td>`,ndCls[ci])).join('');
+  const avgDirCells=avgDir.map((v,ci)=>{const nc=ci===nowCi?'now-col':'';return injectColCls(`<td class="${['dir-cell',pastCls[ci]||'',nc].filter(Boolean).join(' ')}">${v!=null?dirArrow(v):'—'}</td>`,ndCls[ci]);}).join('');
 
   // ── RAIN ──
   const rainModelRows=allActive.map(m=>{
@@ -1299,11 +1302,11 @@ function renderHourly(){
   }).join('');
 
   const iconKey=onlyEnabled[0]?.key||allActive[0]?.key;
-  const iconCells=hVals(iconKey,'weathercode',indices).map((c,ci)=>injectColCls(`<td class="${pastCls[ci]||''}">${wxIcon(c)}</td>`,ndCls[ci])).join('');
+  const iconCells=hVals(iconKey,'weathercode',indices).map((c,ci)=>{const nc=ci===nowCi?'now-col':'';return injectColCls(`<td class="${[pastCls[ci]||'',nc].filter(Boolean).join(' ')}">${wxIcon(c)}</td>`,ndCls[ci]);}).join('');
 
 
   // ── Actual (ERA5) data rows ──
-  function buildActualCells(field, indices, fmtFn, clsFn){
+  function buildActualCells(field, indices, fmtFn, clsFn, nowCiRef){
     if(!actualData)return indices.map(()=>'<td class="empty">–</td>').join('');
     const actTimes=actualData.hourly.time;
     const actVals=actualData.hourly[field]||[];
@@ -1317,12 +1320,12 @@ function renderHourly(){
       if(ai===undefined)return '<td class="empty">–</td>';
       const v=actVals[ai];
       if(v==null)return '<td class="empty">–</td>';
-      const cls=clsFn?clsFn(v):'';
-      return injectColCls(`<td class="${cls}">${fmtFn(v)}</td>`,ndCls[ci]);
+      const cls=clsFn?clsFn(v):''; const nc=(nowCiRef!==undefined&&ci===nowCiRef)?'now-col':'';
+      return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(' ')}">${fmtFn(v)}</td>`,ndCls[ci]);
     }).join('');
   }
-  const actualTempCells=buildActualCells('temperature_2m',indices,v=>v.toFixed(0)+'°',tempCls);
-  const actualRainCells=buildActualCells('precipitation',indices,v=>v<0.05?'<span class="empty">0</span>':v.toFixed(1),rainCls);
+  const actualTempCells=buildActualCells('temperature_2m',indices,v=>v.toFixed(0)+'°',tempCls,nowCi);
+  const actualRainCells=buildActualCells('precipitation',indices,v=>v<0.05?'<span class="empty">0</span>':v.toFixed(1),rainCls,nowCi);
 
   document.querySelector('.ftable').innerHTML=`
     <tbody>
