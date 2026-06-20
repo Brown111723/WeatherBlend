@@ -947,10 +947,10 @@ async function fetchWeatherAPI(m){
 
       for(const hr of (day.hour||[])){
         // WA time format: "2024-01-15 14:00"
-        const t=hr.time.replace(' ','T').slice(0,16)+':00';
+        const t=hr.time.replace(' ','T').slice(0,16);
         // Only include on-the-hour entries
         if(!hr.time.endsWith(':00'))continue;
-        hTime.push(t);
+        hTime.push(t.slice(0,16));
         hTemp.push(hr.temp_c??null);
         hPrecip.push(hr.precip_mm??0);
         hWind.push(hr.wind_kph??null);
@@ -984,7 +984,7 @@ async function fetchWeatherAPI(m){
         actDaily.precipitation_sum.push(day.day?.totalprecip_mm??0);
         for(const hr of (day.hour||[])){
           if(!hr.time.endsWith(':00'))continue;
-          actHourly.time.push(hr.time.replace(' ','T').slice(0,16)+':00');
+          actHourly.time.push(hr.time.replace(' ','T').slice(0,16));
           actHourly.temperature_2m.push(hr.temp_c??null);
           actHourly.precipitation.push(hr.precip_mm??0);
           actHourly.cloudcover.push(hr.cloud??null);
@@ -1007,8 +1007,9 @@ async function fetchWeatherAPI(m){
 // HISTORICAL ACTUALS + MODEL WEIGHT CALC
 // ══════════════════════════════════════════
 async function fetchActualsAndComputeWeights(){
-  // If WeatherAPI already set actualData as preferred source, skip OM historical fetch
-  const skipHistFetch=actualData?._source==='wa';
+  // We always fetch OM historical for weight calculations (it covers all models).
+  // If WA also loaded, it will override actualData for display after this.
+  const waActuals=actualData?._source==='wa'?actualData:null;
   try{
     // Use the Historical Forecast API (historical-forecast-api.open-meteo.com)
     // This stitches the first hours of each model run into a continuous timeseries,
@@ -1020,21 +1021,19 @@ async function fetchActualsAndComputeWeights(){
     const startDate=new Date(); startDate.setDate(startDate.getDate()-7);
     const fmt=d=>d.toISOString().slice(0,10);
 
-    if(skipHistFetch){console.log('Using WA actuals, skipping OM historical fetch');}
-    const url=!skipHistFetch&&`https://historical-forecast-api.open-meteo.com/v1/forecast`
+    const url=`https://historical-forecast-api.open-meteo.com/v1/forecast`
       +`?latitude=${state.lat}&longitude=${state.lon}`
       +`&hourly=temperature_2m,precipitation,cloudcover`
       +`&daily=temperature_2m_max,temperature_2m_min,precipitation_sum`
       +`&start_date=${fmt(startDate)}&end_date=${fmt(endDate)}`
       +`&timezone=auto&wind_speed_unit=kmh`;
 
-    if(!skipHistFetch){
-      const res=await fetch(url);
-      if(!res.ok)throw new Error(`Historical API ${res.status}`);
-      const json=await res.json();
-      if(json.error)throw new Error(json.reason);
-      actualData=json;
-    }
+    const res=await fetch(url);
+    if(!res.ok)throw new Error(`Historical API ${res.status}`);
+    const json=await res.json();
+    if(json.error)throw new Error(json.reason);
+    // Use OM data temporarily for weight calculations
+    actualData=json;
 
     const activeMods=activeEnabled();
     if(!activeMods.length)return;
@@ -1115,6 +1114,8 @@ async function fetchActualsAndComputeWeights(){
       activeMods.forEach(m=>{ modelWeights[m.key]=1/activeMods.length; });
     }
 
+    // Weight calc done using OM data. Now restore WA actuals for display if available.
+    if(waActuals)actualData=waActuals;
     console.log('Recency-weighted RMSE:',
       Object.fromEntries(activeMods.map(m=>[m.label,rmse[m.key]?.toFixed(3)])));
     console.log('Model weights:',
