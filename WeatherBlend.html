@@ -387,10 +387,6 @@ window.addEventListener('DOMContentLoaded',()=>{
   loadPrefs();
   buildSourcesPanel();
   updateDetailBtn();
-  document.querySelectorAll('#view-btns .btn').forEach(b=>{
-    const m=b.getAttribute('onclick')?.match(/'([^']+)'/);
-    if(m)b.classList.toggle('active',m[1]===state.view);
-  });
   getLocation();
 });
 
@@ -435,7 +431,10 @@ function toggleVertical(btn){
   verticalLayout=!verticalLayout;
   if(btn){btn.classList.toggle('enabled',verticalLayout);btn.classList.toggle('disabled',!verticalLayout);}
   savePrefs();
-  if(Object.keys(state.data).length)renderTable();
+  if(Object.keys(state.data).length){
+    renderTable();
+    // scrollToNow is already called by renderVertical/renderHourly internally
+  }
 }
 function toggleWeighting(btn){
   useWeightedAvg=!useWeightedAvg;
@@ -546,7 +545,6 @@ function loadPrefs(){
     if(p.verticalLayout!==undefined)verticalLayout=p.verticalLayout;
     if(p.secVisible)Object.assign(secVisible,p.secVisible);
     if(p.enabled){enabled.clear();p.enabled.forEach(k=>{if(MODELS.find(m=>m.key===k))enabled.add(k);});}
-    if(p.view)state.view=p.view;
   }catch(e){}
 }
 function saveLocation(lat,lon,name){
@@ -833,6 +831,7 @@ async function fetchActualsAndComputeWeights(){
     const url=`https://historical-forecast-api.open-meteo.com/v1/forecast`
       +`?latitude=${state.lat}&longitude=${state.lon}`
       +`&hourly=temperature_2m,precipitation`
+      +`&daily=temperature_2m_max,temperature_2m_min,precipitation_sum`
       +`&start_date=${fmt(startDate)}&end_date=${fmt(endDate)}`
       +`&timezone=auto&wind_speed_unit=kmh`;
 
@@ -1331,34 +1330,64 @@ function renderDaily(){
   const onlyEnabled=activeEnabled();
   const firstKey=onlyEnabled[0]?.key||allActive[0].key;
   const ref=state.data[firstKey].daily;
-  const now=new Date();const todayStr=now.toISOString().slice(0,10);
-  let si=ref.time.findIndex(t=>t>=todayStr);if(si<0)si=0;
-  const indices=Array.from({length:Math.min(10,ref.time.length-si)},(_,i)=>si+i);
+  const now=new Date();
+  const todayStr=now.toISOString().slice(0,10);
 
-
+  // Include past 7 days + next 10 (daily data includes past_days=7 from model fetch)
+  // Go back up to 7 days or start of data
+  let todaySi=ref.time.findIndex(t=>t>=todayStr);if(todaySi<0)todaySi=ref.time.length-1;
+  const pastSi=Math.max(0,todaySi-7);
+  const indices=Array.from({length:Math.min(17,ref.time.length-pastSi)},(_,i)=>pastSi+i);
 
   const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayHdrs=indices.map(i=>{
-    const d=new Date(ref.time[i]+'T12:00:00');const isToday=ref.time[i]===todayStr;
-    return`<th class="${isToday?'now-col':''}" style="min-width:72px"><span class="col-day">${DAYS[d.getDay()]}</span><span class="col-time">${d.getDate()} ${d.toLocaleDateString('en-AU',{month:'short'})}</span></th>`;
+    const d=new Date(ref.time[i]+'T12:00:00');
+    const isToday=ref.time[i]===todayStr;
+    const isPast=ref.time[i]<todayStr;
+    const style=isPast?'opacity:.75':'';
+    return`<th class="${isToday?'now-col':''}" style="min-width:72px;${style}"><span class="col-day">${DAYS[d.getDay()]} ${d.getDate()}</span><span class="col-time">${d.toLocaleDateString('en-AU',{month:'short'})}</span></th>`;
   }).join('');
 
   function dVals(key,field){const d=state.data[key]?.daily;if(!d)return indices.map(()=>null);return indices.map(i=>d[field]?.[i]??null);}
-  const iconCells=dVals(firstKey,'weathercode').map(c=>`<td>${wxIcon(c)}</td>`).join('');
-  const C=indices.length+1;const blanks=Array(indices.length).fill('<td></td>').join('');
 
+  const iconCells=dVals(firstKey,'weathercode').map(c=>`<td>${wxIcon(c)}</td>`).join('');
+  const C=indices.length+1;
+  const blanks=Array(indices.length).fill('<td></td>').join('');
+
+  // ── TEMP ──
   const tempModelRows=allActive.map(m=>{
     const mx=dVals(m.key,'temperature_2m_max'),mn=dVals(m.key,'temperature_2m_min');
-    const cells=mx.map((hi,ci)=>{const lo=mn[ci],cls=hi!=null?tempCls(hi):'';return`<td class="${cls}"><span style="font-size:15px">${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;}).join('');
+    const cells=mx.map((hi,ci)=>{
+      const lo=mn[ci],cls=hi!=null?tempCls(hi):'';
+      return`<td class="${cls}"><span>${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;
+    }).join('');
     return`<tr class="${srcRowClass(m)}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span><span style="font-size:10px;color:var(--text-muted)">${(()=>{const w=modelWeights[m.key];if(!w)return '';const pct=Math.round(w*100);const cls=pct>=20?'high':pct>=10?'mid':'low';return '<span class="weight-badge '+cls+'">'+pct+'%</span>';})()}</span></span></td>${cells}</tr>`;
   }).join('');
   const avgMax=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'temperature_2m_max')[ci]}))));
   const avgMin=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'temperature_2m_min')[ci]}))));
-  const avgTempCells=avgMax.map((hi,ci)=>{const lo=avgMin[ci],cls=hi!=null?tempCls(hi):'';return`<td class="${cls}"><span>${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;}).join('');
+  const avgTempCells=avgMax.map((hi,ci)=>{
+    const lo=avgMin[ci],cls=hi!=null?tempCls(hi):'';
+    return`<td class="${cls}"><span>${hi!=null?hi.toFixed(0)+'°':'—'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'—'}</span></td>`;
+  }).join('');
 
+  // Actual daily temp — from Historical Forecast API daily data
+  const actualTempCells=indices.map(i=>{
+    const dateStr=ref.time[i];
+    if(dateStr>=todayStr)return'<td class="empty">–</td>'; // no actuals for today+
+    if(!actualData?.daily)return'<td class="empty">–</td>';
+    const ai=actualData.daily.time?.findIndex(t=>t===dateStr)??-1;
+    if(ai<0)return'<td class="empty">–</td>';
+    const hi=actualData.daily.temperature_2m_max?.[ai];
+    const lo=actualData.daily.temperature_2m_min?.[ai];
+    const cls=hi!=null?tempCls(hi):'';
+    return`<td class="${cls}"><span>${hi!=null?hi.toFixed(0)+'°':'–'}</span><span style="color:var(--text-muted);font-size:13px"> / ${lo!=null?lo.toFixed(0)+'°':'–'}</span></td>`;
+  }).join('');
+
+  // ── WIND ──
   const avgWind=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'windspeed_10m_max')[ci]}))));
   const avgWindCells=avgWind.map(v=>`<td class="${v!=null?windCls(v):''}">${fmt(v,0)}</td>`).join('');
 
+  // ── RAIN ──
   const rainModelRows=allActive.map(m=>{
     const v=dVals(m.key,'precipitation_sum');
     const cells=v.map(x=>{const cls=rainCls(x),txt=x==null?'—':x<0.1?'<span class="empty">0</span>':x.toFixed(1);return`<td class="${cls}">${txt}</td>`;}).join('');
@@ -1366,6 +1395,17 @@ function renderDaily(){
   }).join('');
   const avgRain=indices.map((_,ci)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'precipitation_sum')[ci]}))));
   const avgRainCells=avgRain.map(v=>{const cls=rainCls(v),txt=v==null?'—':v<0.1?'<span class="empty">0</span>':v.toFixed(1);return`<td class="${cls}">${txt}</td>`;}).join('');
+
+  const actualRainCells=indices.map(i=>{
+    const dateStr=ref.time[i];
+    if(dateStr>=todayStr)return'<td class="empty">–</td>';
+    if(!actualData?.daily)return'<td class="empty">–</td>';
+    const ai=actualData.daily.time?.findIndex(t=>t===dateStr)??-1;
+    if(ai<0)return'<td class="empty">–</td>';
+    const v=actualData.daily.precipitation_sum?.[ai];
+    const cls=rainCls(v);
+    return`<td class="${cls}">${v!=null?(v<0.1?'<span class="empty">0</span>':v.toFixed(1)):'–'}</td>`;
+  }).join('');
 
   document.querySelector('.ftable').innerHTML=`
     <tbody>
@@ -1375,19 +1415,32 @@ function renderDaily(){
       <tr class="spacer"><td colspan="${C}"></td></tr>
     </tbody>
     ${secGroup('temp',`
-      <tr class="sec-head-temp"><td class="row-label">🌡 Temp °C</td>${avgTempCells}</tr>
+      <tr class="sec-head-temp"><td class="row-label">🌡 Temp</td>${avgTempCells}</tr>
       ${tempModelRows}
+      ${actualData?`<tr class="actual-row"><td class="row-label" style="color:#86efac">✓ Actual</td>${actualTempCells}</tr>`:''}
+      <tr class="spacer"><td colspan="${C}"></td></tr>
+    `)}
+    ${secGroup('wind',`
+      <tr class="sec-head-wind"><td class="row-label">💨 Wind</td>${avgWindCells}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('rain',`
       <tr class="sec-head-rain"><td class="row-label">🌧 Rain</td>${avgRainCells}</tr>
       ${rainModelRows}
-      <tr class="spacer"><td colspan="${C}"></td></tr>
-    `)}
-    ${secGroup('wind',`
-      <tr class="sec-head-wind"><td class="row-label">💨 Wind</td>${avgWindCells}</tr>
+      ${actualData?`<tr class="actual-row"><td class="row-label" style="color:#90caf9">✓ Actual</td>${actualRainCells}</tr>`:''}
     `)}`;
+
+  // Scroll to today column
+  requestAnimationFrame(()=>{
+    const wrap=document.querySelector('.table-wrap');
+    const nowTh=document.querySelector('.hour-header th.now-col');
+    if(!wrap||!nowTh)return;
+    const labelW=98;
+    const colW=nowTh.offsetWidth||72;
+    wrap.scrollLeft=Math.max(0,nowTh.offsetLeft-labelW-colW*2);
+  });
 }
+
 
 // ══════════════════════════════════════════
 // UI HELPERS
