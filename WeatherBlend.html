@@ -106,14 +106,15 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 /* ── Table ── */
 .table-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);padding-bottom:40px;position:relative;}
-#now-overlay{position:absolute;top:0;bottom:0;width:0;border-left:2px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
-#now-overlay-h{position:absolute;left:0;right:0;height:0;border-top:2px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
+#now-overlay{position:absolute;top:0;height:100%;width:0;border-left:1px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
+#now-overlay-h{position:absolute;left:0;width:100%;height:0;border-top:1px dotted #ef4444;pointer-events:none;z-index:20;display:none;}
 .ftable{width:100%;border-collapse:separate;border-spacing:0;font-family:'JetBrains Mono',monospace;}
 .ftable th,.ftable td{white-space:nowrap;}
 .row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:98px;max-width:98px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
 .hour-header th.row-label{background:var(--bg);z-index:15;}
 .hour-header th{padding:12px 6px 8px;font-size:14px;font-weight:500;color:var(--text-muted);text-align:center;background:var(--bg);position:sticky;top:0;z-index:10;min-width:64px;border-bottom:2px solid var(--border);}
 .hour-header th.now-col{color:#ef4444;}
+.hour-header th.now-col .col-day,.hour-header th.now-col .col-time{color:#ef4444!important;}
 
 
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
@@ -869,7 +870,7 @@ async function fetchActualsAndComputeWeights(){
 
     const url=`https://historical-forecast-api.open-meteo.com/v1/forecast`
       +`?latitude=${state.lat}&longitude=${state.lon}`
-      +`&hourly=temperature_2m,precipitation`
+      +`&hourly=temperature_2m,precipitation,cloudcover`
       +`&daily=temperature_2m_max,temperature_2m_min,precipitation_sum`
       +`&start_date=${fmt(startDate)}&end_date=${fmt(endDate)}`
       +`&timezone=auto&wind_speed_unit=kmh`;
@@ -1217,7 +1218,7 @@ function renderVerticalDaily(){
     const d=new Date(dateStr+'T12:00:00');
     const isToday=dateStr===todayStr;
     const isPast=dateStr<todayStr;
-    const labelStyle=`font-family:'Inter',sans-serif;font-size:13px;white-space:nowrap;${isToday?'color:var(--accent);font-weight:700':isPast?'opacity:.65':''}`;
+    const labelStyle=`font-family:'Inter',sans-serif;font-size:13px;white-space:nowrap;${isToday?'color:#ef4444;font-weight:700':isPast?'opacity:.65':''}`;
     const ai=actDailyMap[dateStr];
     const cells=cols.map(c=>{
       switch(c.id){
@@ -1269,30 +1270,28 @@ function positionNowOverlay(){
   requestAnimationFrame(()=>{
     const wrap=document.getElementById('table-wrap');
     if(!wrap)return;
-    // Horizontal view: vertical red line over now column
-    const nowTh=document.querySelector('.hour-header th.now-col');
     const ovV=document.getElementById('now-overlay');
-    if(nowTh&&ovV&&!verticalLayout){
-      const wrapRect=wrap.getBoundingClientRect();
-      const thRect=nowTh.getBoundingClientRect();
-      // Position relative to the scrollable wrap content
-      const left=nowTh.offsetLeft+Math.floor(nowTh.offsetWidth/2);
-      ovV.style.left=left+'px';
-      ovV.style.display='block';
-      ovV.style.top='0';
-      ovV.style.bottom='0';
-    } else if(ovV){
-      ovV.style.display='none';
-    }
-    // Vertical view: horizontal red line over now row
-    const nowRow=document.getElementById('now-row');
     const ovH=document.getElementById('now-overlay-h');
-    if(nowRow&&ovH&&verticalLayout){
-      const top=nowRow.offsetTop+Math.floor(nowRow.offsetHeight/2);
-      ovH.style.top=top+'px';
-      ovH.style.display='block';
-    } else if(ovH){
-      ovH.style.display='none';
+    if(!verticalLayout){
+      // Horizontal: vertical line at LEFT EDGE of now column
+      const nowTh=document.querySelector('.hour-header th.now-col');
+      if(nowTh&&ovV){
+        ovV.style.left=nowTh.offsetLeft+'px';
+        ovV.style.top='0';
+        ovV.style.height=wrap.scrollHeight+'px';
+        ovV.style.display='block';
+      } else if(ovV){ovV.style.display='none';}
+      if(ovH)ovH.style.display='none';
+    } else {
+      // Vertical: horizontal line at TOP EDGE of now row
+      const nowRow=document.getElementById('now-row');
+      if(nowRow&&ovH){
+        ovH.style.top=nowRow.offsetTop+'px';
+        ovH.style.left='0';
+        ovH.style.width=wrap.scrollWidth+'px';
+        ovH.style.display='block';
+      } else if(ovH){ovH.style.display='none';}
+      if(ovV)ovV.style.display='none';
     }
   });
 }
