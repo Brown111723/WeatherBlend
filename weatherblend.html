@@ -689,12 +689,14 @@ async function fetchAllModels(){
     if(m.goog){await fetchGoogleWeather(m);return;}
     if(m.bomFcst){await fetchBOMForecast(m);updatePills();return;}
     try{
+      // bom_access_global doesn't support past_days
+      const noPast = m.key === 'bom_access_global';
       const url=`https://api.open-meteo.com${m.ep}`
         +`?latitude=${state.lat}&longitude=${state.lon}`
         +`&hourly=precipitation,windspeed_10m,winddirection_10m,temperature_2m,weathercode,cloudcover`
         +`&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,`
         +`windspeed_10m_max,winddirection_10m_dominant,sunrise,sunset`
-        +`&models=${m.key}&past_days=7&forecast_days=10&timezone=auto&wind_speed_unit=kmh`;
+        +`&models=${m.key}${noPast?'':'&past_days=7'}&forecast_days=10&timezone=auto&wind_speed_unit=kmh`;
       const res=await fetch(url);if(!res.ok)throw new Error(`HTTP ${res.status}`);
       const json=await res.json();if(json.error)throw new Error(json.reason||'API error');
       if(!json.hourly?.temperature_2m?.some(v=>v!=null))throw new Error('No data');
@@ -1132,12 +1134,33 @@ const BOM_STATE_PROD = {
   SA:'IDS60801',  WA:'IDW60801',  TAS:'IDT60801', NT:'IDD60801'
 };
 
+// ── CORS proxy helper — tries multiple free proxies in sequence ─────────────
+const CORS_PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
+];
+
+async function proxyFetch(url, timeoutMs = 10000) {
+  let lastErr;
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(timeoutMs) });
+      if (res.ok) return res;
+      lastErr = new Error(`HTTP ${res.status} from proxy`);
+    } catch(e) {
+      lastErr = e;
+      console.warn(`Proxy failed for ${url.slice(0,50)}: ${e.message}`);
+    }
+  }
+  throw lastErr || new Error('All proxies failed');
+}
+
 // ── BOM PAST ACTUALS (stations.txt → fwo observation JSON) ───────────────
 // Fetches reg.bom.gov.au/climate/data/lists_by_element/stations.txt,
 // finds the nearest station WITH a valid WMO number, then fetches its 72hr
 // observation JSON for use in the Actual row.
 async function fetchBOMActuals() {
-  const PROXY = 'https://api.allorigins.win/raw?url=';
   try {
     const lat = state.lat, lon = state.lon;
 
@@ -1209,7 +1232,7 @@ async function fetchBOMActuals() {
     // ── 4. Fetch observation JSON ─────────────────────────────────────────
     setStatus('spin', `BOM: fetching ${stnName}…`);
     const fwoUrl = `http://www.bom.gov.au/fwo/${productId}/${productId}.${wmo}.json`;
-    const fwoRes = await fetch(PROXY + encodeURIComponent(fwoUrl), { signal: AbortSignal.timeout(10000) });
+    const fwoRes = await proxyFetch(fwoUrl, 10000);
     if (!fwoRes.ok) throw new Error(`BOM fwo HTTP ${fwoRes.status}`);
     const fwoJson = await fwoRes.json();
     const obs = fwoJson?.observations?.data;
@@ -1277,14 +1300,13 @@ async function fetchBOMActuals() {
 // 2. GET /v1/locations/<6-char-geohash>/forecasts/hourly → parse hourly data
 // Returns data shaped like Open-Meteo hourly so it can slot into state.data
 async function fetchBOMForecast(model) {
-  const PROXY = 'https://api.allorigins.win/raw?url=';
   const BASE  = 'https://api.weather.bom.gov.au/v1';
   try {
     // ── 1. Location search → geohash ──────────────────────────────────────
     // Use the stored location name, falling back to coords
     const locName = document.getElementById('loc-name').textContent.split(',')[0].trim();
     const searchUrl = `${BASE}/locations?search=${encodeURIComponent(locName)}`;
-    const locRes = await fetch(PROXY + encodeURIComponent(searchUrl), { signal: AbortSignal.timeout(8000) });
+    const locRes = await proxyFetch(searchUrl, 8000);
     if (!locRes.ok) throw new Error(`Location search HTTP ${locRes.status}`);
     const locJson = await locRes.json();
     const locations = locJson?.data;
@@ -1309,7 +1331,7 @@ async function fetchBOMForecast(model) {
 
     // ── 2. Hourly forecast ─────────────────────────────────────────────────
     const fcUrl = `${BASE}/locations/${geohash6}/forecasts/hourly`;
-    const fcRes = await fetch(PROXY + encodeURIComponent(fcUrl), { signal: AbortSignal.timeout(8000) });
+    const fcRes = await proxyFetch(fcUrl, 8000);
     if (!fcRes.ok) throw new Error(`Hourly forecast HTTP ${fcRes.status}`);
     const fcJson = await fcRes.json();
     const hours  = fcJson?.data;
