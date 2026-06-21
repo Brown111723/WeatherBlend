@@ -1288,95 +1288,100 @@ async function fetchBOMActuals() {
 }
 
 // ── BOM OFFICIAL HOURLY FORECAST (api.weather.bom.gov.au) ────────────────
-// 1. GET /v1/locations?search=<name> → extract geohash of closest result
-// 2. GET /v1/locations/<6-char-geohash>/forecasts/hourly → parse hourly data
-// Returns data shaped like Open-Meteo hourly so it can slot into state.data
+// 1. Search /v1/locations?search=<name> → pick first result → take 6-char geohash
+// 2. Fetch /v1/locations/<geohash6>/forecasts/hourly → parse hourly slots
+//
+// Location search response shape:
+//   { data: [ { geohash, name, state, timezone, ... } ] }
+//   Note: NO lat/lon in results — just use the first/best-named match
+//
+// Hourly forecast response shape (each element of data[]):
+//   { time, temp, rain:{amount:{min,max,units}, chance},
+//     wind:{speed_knot, speed_kilometre, direction},
+//     icon_descriptor, is_night, next_forecast_period }
 async function fetchBOMForecast(model) {
-  const BASE  = 'https://api.weather.bom.gov.au/v1';
+  const BASE = 'https://api.weather.bom.gov.au/v1';
   try {
-    // ── 1. Location search → geohash ──────────────────────────────────────
-    // Use the stored location name, falling back to coords
-    const locName = document.getElementById('loc-name').textContent.split(',')[0].trim();
-    const searchUrl = `${BASE}/locations?search=${encodeURIComponent(locName)}`;
+    // ── 1. Get location name from the UI ─────────────────────────────────
+    const rawLoc = (document.getElementById('loc-name')?.textContent || state.city || '').trim();
+    // Strip country suffix e.g. "Bathurst,AU." → "Bathurst"
+    const searchTerm = rawLoc.split(',')[0].trim();
+    if (!searchTerm) throw new Error('No location name available');
+
+    // ── 2. Search for location to get geohash ────────────────────────────
+    const searchUrl = `${BASE}/locations?search=${encodeURIComponent(searchTerm)}`;
     const locRes = await proxyFetch(searchUrl, 8000);
     const locJson = await locRes.json();
     const locations = locJson?.data;
-    if (!Array.isArray(locations) || !locations.length) throw new Error('No location results');
-    console.log('BOM location API first result:', JSON.stringify(locations[0]));
+    if (!Array.isArray(locations) || !locations.length) throw new Error(`No BOM locations found for "${searchTerm}"`);
 
-    // Pick the result closest to our known lat/lon
-    let bestLoc = locations[0];
-    let bestDist = Infinity;
-    for (const loc of locations) {
-      if (!loc.geohash) continue;
-      // BOM locations have lat/lon in the response
-      // BOM location API may nest coords or use different field names
-      const lLat = loc.latitude ?? loc.lat ?? loc.geolocation?.latitude;
-      const lLon = loc.longitude ?? loc.lon ?? loc.geolocation?.longitude;
-      if (lLat == null || lLon == null) { bestLoc = bestLoc || loc; continue; }
-      const d = haversineKm(state.lat, state.lon, parseFloat(lLat), parseFloat(lLon));
-      if (d < bestDist) { bestDist = d; bestLoc = loc; }
-    }
+    // Pick best match: prefer exact name match, otherwise take first result
+    const searchLower = searchTerm.toLowerCase();
+    const bestLoc = locations.find(l => (l.name||'').toLowerCase() === searchLower)
+                 || locations.find(l => (l.name||'').toLowerCase().startsWith(searchLower))
+                 || locations[0];
 
-    if (!bestLoc?.geohash) throw new Error('No geohash in results');
+    if (!bestLoc?.geohash) throw new Error('Location result has no geohash');
     const geohash6 = bestLoc.geohash.slice(0, 6);
-    console.log(`BOM forecast: geohash=${geohash6} (${bestLoc.name||''}, ${bestDist.toFixed(1)} km)`);
+    console.log(`BOM forecast: geohash=${geohash6} (${bestLoc.name}, ${bestLoc.state})`);
 
-    // ── 2. Hourly forecast ─────────────────────────────────────────────────
+    // ── 3. Fetch hourly forecast ──────────────────────────────────────────
     const fcUrl = `${BASE}/locations/${geohash6}/forecasts/hourly`;
     const fcRes = await proxyFetch(fcUrl, 8000);
     const fcJson = await fcRes.json();
-    const hours  = fcJson?.data;
+    const hours = fcJson?.data;
     if (!Array.isArray(hours) || !hours.length) throw new Error('No hourly forecast data');
 
-    // ── 3. Parse into Open-Meteo-compatible shape ──────────────────────────
-    // BOM hourly slot fields:
-    //   time          : ISO8601 string e.g. "2026-06-21T09:00:00+10:00"
-    //   temp          : °C  (integer)
-    //   rain.amount.max : mm (float) — use as precipitation
-    //   wind.speed_kilometre : km/h
-    //   wind.direction : compass string e.g. "WSW"
-    //   icon_descriptor: string e.g. "mostly_sunny"
-    const compassDeg = { N:0,NNE:22,NE:45,ENE:67,E:90,ESE:112,SE:135,SSE:157,
-                         S:180,SSW:202,SW:225,WSW:247,W:270,WNW:292,NW:315,NNW:337 };
+    // ── 4. Parse into Open-Meteo-compatible shape ─────────────────────────
+    // wind.direction is a compass string e.g. "WSW" → convert to degrees
+    const compassDeg = { N:0, NNE:22, NE:45, ENE:67, E:90, ESE:112, SE:135, SSE:157,
+                         S:180, SSW:202, SW:225, WSW:247, W:270, WNW:292, NW:315, NNW:337 };
 
     const hTime=[], hTemp=[], hPrec=[], hWspd=[], hWdir=[], hCode=[];
+
     for (const h of hours) {
-      // Normalise timestamp to "YYYY-MM-DDTHH:00" (strip seconds + offset)
-      const raw = h.time || '';
-      const tKey = raw.slice(0,16); // "2026-06-21T09:00"
+      // time: ISO8601 with offset e.g. "2026-06-21T09:00:00+10:00"
+      // Normalise to "YYYY-MM-DDTHH:00" to match model hourly keys
+      const tKey = (h.time || '').slice(0, 16).replace(/T(\d{2}):\d{2}$/, (_, hr) => `T${hr}:00`);
+      if (!tKey) continue;
+
       hTime.push(tKey);
       hTemp.push(h.temp ?? null);
-      // Rain: use max amount as the hourly precip estimate
+
+      // Rain: use max amount (most conservative estimate)
       const rainMax = h.rain?.amount?.max ?? h.rain?.amount?.min ?? null;
       hPrec.push(rainMax);
+
+      // Wind
       hWspd.push(h.wind?.speed_kilometre ?? null);
       hWdir.push(compassDeg[h.wind?.direction] ?? null);
-      // Map BOM icon to WMO weathercode (approximate)
-      const icon = h.icon_descriptor || '';
-      let wcode = 1; // mainly clear default
-      if (icon.includes('thunder'))        wcode = 95;
+
+      // Map icon_descriptor to approximate WMO weather code
+      const icon = (h.icon_descriptor || '').toLowerCase();
+      let wcode = 1;
+      if      (icon.includes('thunder'))                          wcode = 95;
       else if (icon.includes('rain') || icon.includes('shower')) wcode = 61;
-      else if (icon.includes('drizzle'))   wcode = 51;
-      else if (icon.includes('snow'))      wcode = 71;
-      else if (icon.includes('fog'))       wcode = 45;
-      else if (icon.includes('overcast'))  wcode = 3;
-      else if (icon.includes('cloudy'))    wcode = 2;
-      else if (icon.includes('mostly_sunny') || icon.includes('partly')) wcode = 2;
+      else if (icon.includes('drizzle'))                         wcode = 51;
+      else if (icon.includes('snow'))                            wcode = 71;
+      else if (icon.includes('fog') || icon.includes('haze'))    wcode = 45;
+      else if (icon.includes('overcast'))                        wcode = 3;
+      else if (icon.includes('mostly_cloudy'))                   wcode = 3;
+      else if (icon.includes('cloudy') || icon.includes('partly_cloudy')) wcode = 2;
       else if (icon.includes('sunny') || icon.includes('clear')) wcode = 0;
       hCode.push(wcode);
     }
 
-    // Build daily from hourly
+    // ── 5. Build daily summaries from hourly data ─────────────────────────
     const byDay = {};
-    hTime.forEach((t,i) => {
-      const d = t.slice(0,10);
-      if (!byDay[d]) byDay[d] = { temps:[], rain:0, wcodes:[], wspds:[] };
-      if (hTemp[i]!=null) byDay[d].temps.push(hTemp[i]);
-      if (hPrec[i]!=null) byDay[d].rain += hPrec[i];
-      byDay[d].wcodes.push(hCode[i]);
-      if (hWspd[i]!=null) byDay[d].wspds.push(hWspd[i]);
+    hTime.forEach((t, i) => {
+      const d = t.slice(0, 10);
+      if (!byDay[d]) byDay[d] = { temps:[], rain:0, codes:[], wspds:[] };
+      if (hTemp[i]  != null) byDay[d].temps.push(hTemp[i]);
+      if (hPrec[i]  != null) byDay[d].rain += hPrec[i];
+      if (hWspd[i]  != null) byDay[d].wspds.push(hWspd[i]);
+      byDay[d].codes.push(hCode[i]);
     });
+
     const dTime=[], dMax=[], dMin=[], dRain=[], dCode=[], dWmax=[];
     for (const d of Object.keys(byDay).sort()) {
       const b = byDay[d];
@@ -1384,37 +1389,35 @@ async function fetchBOMForecast(model) {
       dMax.push(b.temps.length ? Math.max(...b.temps) : null);
       dMin.push(b.temps.length ? Math.min(...b.temps) : null);
       dRain.push(b.rain);
-      dCode.push(b.wcodes[Math.floor(b.wcodes.length/2)] ?? 1); // mid-day code
+      dCode.push(b.codes[Math.floor(b.codes.length / 2)] ?? 1);
       dWmax.push(b.wspds.length ? Math.max(...b.wspds) : null);
     }
 
-    // Shape to match what state.data[key] expects (Open-Meteo structure)
-    const shaped = {
+    // Store in state.data shaped to match what the render pipeline expects
+    state.data[model.key] = {
       hourly: {
-        time: hTime,
-        temperature_2m: hTemp,
-        precipitation: hPrec,
-        windspeed_10m: hWspd,
-        winddirection_10m: hWdir,
-        weathercode: hCode,
-        cloudcover: hTime.map(()=>null), // BOM doesn't provide %
+        time:               hTime,
+        temperature_2m:     hTemp,
+        precipitation:      hPrec,
+        windspeed_10m:      hWspd,
+        winddirection_10m:  hWdir,
+        weathercode:        hCode,
+        cloudcover:         hTime.map(() => null),
       },
       daily: {
-        time: dTime,
-        temperature_2m_max: dMax,
-        temperature_2m_min: dMin,
-        precipitation_sum: dRain,
-        weathercode: dCode,
-        windspeed_10m_max: dWmax,
-        winddirection_10m_dominant: dTime.map(()=>null),
-        sunrise: dTime.map(()=>null),
-        sunset:  dTime.map(()=>null),
+        time:                        dTime,
+        temperature_2m_max:          dMax,
+        temperature_2m_min:          dMin,
+        precipitation_sum:           dRain,
+        weathercode:                 dCode,
+        windspeed_10m_max:           dWmax,
+        winddirection_10m_dominant:  dTime.map(() => null),
+        sunrise:                     dTime.map(() => null),
+        sunset:                      dTime.map(() => null),
       }
     };
-
-    state.data[model.key] = shaped;
     state.status[model.key] = 'ok';
-    console.log(`BOM forecast: ${hTime.length} hourly slots, ${dTime.length} days`);
+    console.log(`BOM forecast: ${hTime.length} hourly slots (${hTime[0]} → ${hTime[hTime.length-1]}), ${dTime.length} days`);
 
   } catch(e) {
     console.warn('BOM forecast failed:', e.message);
