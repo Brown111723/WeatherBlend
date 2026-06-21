@@ -1134,26 +1134,12 @@ const BOM_STATE_PROD = {
   SA:'IDS60801',  WA:'IDW60801',  TAS:'IDT60801', NT:'IDD60801'
 };
 
-// ── CORS proxy helper — tries multiple free proxies in sequence ─────────────
-const CORS_PROXIES = [
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  url => `https://thingproxy.freeboard.io/fetch/${url}`,
-];
-
+// BOM fwo JSON and api.weather.bom.gov.au both support CORS (Access-Control-Allow-Origin: *)
+// so we fetch them directly — no proxy needed.
 async function proxyFetch(url, timeoutMs = 10000) {
-  let lastErr;
-  for (const proxy of CORS_PROXIES) {
-    try {
-      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(timeoutMs) });
-      if (res.ok) return res;
-      lastErr = new Error(`HTTP ${res.status} from proxy`);
-    } catch(e) {
-      lastErr = e;
-      console.warn(`Proxy failed for ${url.slice(0,50)}: ${e.message}`);
-    }
-  }
-  throw lastErr || new Error('All proxies failed');
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res;
 }
 
 // ── BOM PAST ACTUALS (stations.txt → fwo observation JSON) ───────────────
@@ -1202,7 +1188,7 @@ async function fetchBOMActuals() {
       const lastTok = tokens[tokens.length - 1];
       // WMO numbers are 4-6 digit integers; "Y" or "N" are AWS flags
       if (!/^\d{4,6}$/.test(lastTok)) continue; // no valid WMO → skip
-      const wmo = lastTok.padStart(6, '0');
+      const wmo = lastTok; // use WMO exactly as in stations.txt (e.g. '95719', not '095719')
 
       const dist = haversineKm(lat, lon, sLat, sLon);
       if (dist < bestDist) {
@@ -1231,9 +1217,8 @@ async function fetchBOMActuals() {
 
     // ── 4. Fetch observation JSON ─────────────────────────────────────────
     setStatus('spin', `BOM: fetching ${stnName}…`);
-    const fwoUrl = `http://www.bom.gov.au/fwo/${productId}/${productId}.${wmo}.json`;
+    const fwoUrl = `https://www.bom.gov.au/fwo/${productId}/${productId}.${wmo}.json`;
     const fwoRes = await proxyFetch(fwoUrl, 10000);
-    if (!fwoRes.ok) throw new Error(`BOM fwo HTTP ${fwoRes.status}`);
     const fwoJson = await fwoRes.json();
     const obs = fwoJson?.observations?.data;
     if (!Array.isArray(obs) || obs.length === 0) throw new Error('Empty observations');
@@ -1307,7 +1292,6 @@ async function fetchBOMForecast(model) {
     const locName = document.getElementById('loc-name').textContent.split(',')[0].trim();
     const searchUrl = `${BASE}/locations?search=${encodeURIComponent(locName)}`;
     const locRes = await proxyFetch(searchUrl, 8000);
-    if (!locRes.ok) throw new Error(`Location search HTTP ${locRes.status}`);
     const locJson = await locRes.json();
     const locations = locJson?.data;
     if (!Array.isArray(locations) || !locations.length) throw new Error('No location results');
@@ -1332,7 +1316,6 @@ async function fetchBOMForecast(model) {
     // ── 2. Hourly forecast ─────────────────────────────────────────────────
     const fcUrl = `${BASE}/locations/${geohash6}/forecasts/hourly`;
     const fcRes = await proxyFetch(fcUrl, 8000);
-    if (!fcRes.ok) throw new Error(`Hourly forecast HTTP ${fcRes.status}`);
     const fcJson = await fcRes.json();
     const hours  = fcJson?.data;
     if (!Array.isArray(hours) || !hours.length) throw new Error('No hourly forecast data');
