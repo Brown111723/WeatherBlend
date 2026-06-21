@@ -1274,35 +1274,31 @@ async function fetchBOMActuals() {
     // BOM returns newest-first; sort chronologically
     obs.sort((a, b) => (a.local_date_time_full || '').localeCompare(b.local_date_time_full || ''));
 
-    // BOM obs arrive every 30 min. Snap each to nearest hour so keys match
-    // model hourly timestamps (YYYY-MM-DDTHH:00). When two obs snap to same
-    // hour, the later one (closest to the boundary) wins.
-    const byHour = {}; // snapKey -> obs
+    // BOM obs arrive every 30 min (e.g. "20260621093000" = 09:30).
+    // Model hourly slots are always on the hour (T09:00, T10:00...).
+    // Strategy: floor each obs to its own hour — so 09:30 → T09:00.
+    // If both :00 and :30 exist for the same hour, the :00 reading wins
+    // (it is set first and the :30 reading does NOT overwrite it).
+    const byHour = {}; // "YYYY-MM-DDTHH:00" -> obs
     const byDate = {}; // "YYYY-MM-DD" -> { temps:[], precip:0 }
 
     for (const o of obs) {
-      const raw = o.local_date_time_full; // e.g. "20260621090000"
+      const raw = o.local_date_time_full; // "20260621093000" = YYYYMMDDHHmmss
       if (!raw || raw.length < 12) continue;
 
       const yr  = raw.slice(0, 4);
       const mo  = raw.slice(4, 6);
       const dy  = raw.slice(6, 8);
-      const hr  = parseInt(raw.slice(8, 10), 10);
+      const hr  = raw.slice(8, 10);   // keep as string for padStart consistency
       const min = parseInt(raw.slice(10, 12), 10);
 
-      // Snap to nearest hour
-      let snapHr = (min >= 30) ? hr + 1 : hr;
-      let snapDy = dy, snapMo = mo, snapYr = yr;
-      if (snapHr >= 24) {
-        const dt = new Date(`${yr}-${mo}-${dy}T00:00`);
-        dt.setDate(dt.getDate() + 1);
-        snapYr = String(dt.getFullYear());
-        snapMo = String(dt.getMonth() + 1).padStart(2, '0');
-        snapDy = String(dt.getDate()).padStart(2, '0');
-        snapHr = 0;
+      // Floor to the hour — 09:30 becomes T09:00, not T10:00
+      const hourKey = `${yr}-${mo}-${dy}T${hr}:00`;
+
+      // :00 reading takes priority; :30 only fills if hour slot is empty
+      if (min === 0 || !(hourKey in byHour)) {
+        byHour[hourKey] = o;
       }
-      const snapKey = `${snapYr}-${snapMo}-${snapDy}T${String(snapHr).padStart(2, '0')}:00`;
-      byHour[snapKey] = o; // later obs overwrites earlier for same slot
 
       // Daily accumulation (use raw hour to avoid double-counting)
       const dateKey = `${yr}-${mo}-${dy}`;
