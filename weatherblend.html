@@ -125,8 +125,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
 .day-col{background:var(--day-bg)!important;}
 .day-start{border-left:2px solid var(--day-line)!important;}
-/* coloured cells in day columns */
-.day-col/* ── Consistent metric color scheme ── */
+/* ── Consistent metric color scheme ── */
 /* Temperature: cool blue → warm red, bg tint + text */
 .tc{background:rgba(56,135,255,0.16)!important;color:#7eb3ff!important;}
 .tk{background:rgba(56,189,248,0.14)!important;color:#7dd3fc!important;}
@@ -1099,87 +1098,184 @@ async function fetchGoogleActualsFull(){
 // ══════════════════════════════════════════
 // HISTORICAL ACTUALS + MODEL WEIGHT CALC
 // ══════════════════════════════════════════
-async function fetchBOMActuals(){
-  // Translate Python scraper to JS for client-side BOM station lookup + data fetch
+// ── BOM station list (state → product ID prefix mapping) ──────────────────
+// BOM observation JSON URLs follow the pattern:
+//   https://reg.bom.gov.au/fwo/<ProductID>/<ProductID>.<StationID>.json
+// ProductIDs by state:
+const BOM_STATE_PRODUCTS = {
+  NSW: 'IDN60801', ACT: 'IDN60801',
+  VIC: 'IDV60801',
+  QLD: 'IDQ60801',
+  SA:  'IDS60801',
+  WA:  'IDW60801',
+  TAS: 'IDT60801',
+  NT:  'IDD60801',
+};
+
+// BOM publishes a station list JSON we can use for nearest-station lookup
+const BOM_STATIONS_URL = 'https://corsproxy.io/?url=' +
+  encodeURIComponent('http://www.bom.gov.au/climate/data/lists_by_element/alphaAUS_136.txt');
+
+// Haversine distance in km
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+            Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Parse BOM rain_trace field: "0.2" → 0.2, "Trace" → 0.1, "-" or null → 0
+function parseBomRain(val) {
+  if (val == null || val === '-' || val === '') return 0;
+  if (typeof val === 'number') return val;
+  const s = String(val).trim();
+  if (s.toLowerCase() === 'trace') return 0.1;
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+async function fetchBOMActuals() {
   try {
-    // Fetch BOM map page to extract station data
-    const mapUrl = "https://bom.gov.au";
-    const response = await fetch(mapUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
-    });
-    if (!response.ok) throw new Error('BOM map fetch failed');
+    // ── 1. Fetch BOM station list via CORS proxy ──────────────────────────
+    // BOM's climate station list (fixed-width text file) has: stn_id, lat, lon, name, state, etc.
+    // We use a smaller JSON alternative from the BOM OBSERVATIONS API station list.
+    // BOM provides station JSON at: /json/<state_code>.json (list of all stations per state)
+    
+    // Determine which state product to use based on lat/lon bounds
+    const lat = state.lat, lon = state.lon;
+    let stateCode = null;
+    // Rough bounding boxes for Australian states
+    if (lat >= -29 && lat <= -10 && lon >= 129 && lon <= 141) stateCode = 'NT';
+    else if (lat >= -39 && lat <= -29 && lon >= 141 && lon <= 150) stateCode = 'NSW';
+    else if (lat >= -29 && lat <= -10 && lon >= 141 && lon <= 154) stateCode = 'QLD';
+    else if (lat >= -39 && lat <= -29 && lon >= 140 && lon <= 150.5) stateCode = 'VIC';
+    else if (lat >= -39 && lat <= -26 && lon >= 129 && lon <= 141) stateCode = 'SA';
+    else if (lat >= -39 && lat <= -14 && lon >= 113 && lon <= 129) stateCode = 'WA';
+    else if (lat >= -44 && lat <= -39 && lon >= 144 && lon <= 149) stateCode = 'TAS';
+    else if (lat >= -36 && lat <= -35 && lon >= 148 && lon <= 150) stateCode = 'ACT';
+    // Widen NSW to catch ACT overlap, QLD northern tip, etc.
+    else if (lon >= 141 && lon <= 154) stateCode = lat < -29 ? 'NSW' : 'QLD';
+    else if (lon >= 129 && lon <= 141) stateCode = lat < -26 ? 'SA' : 'NT';
+    else if (lon >= 113 && lon <= 129) stateCode = 'WA';
 
-    const text = await response.text();
-
-    // Regex to extract obData stations (JS objects)
-    const pattern = /obData\['(\d+)'\]\s*=\s*(\{.*?\});/gs;
-    const matches = [...text.matchAll(pattern)];
-
-    const stations = [];
-    for (const [, wmoId, jsonLike] of matches) {
-      try {
-        // Clean JS to JSON
-        let clean = jsonLike.replace(/(\w+)\s*:/g, '"$1":');
-        clean = clean.replace(/,\s*}/g, '}');
-        const station = JSON.parse(clean);
-        stations.push(station);
-      } catch (e) { continue; }
+    if (!stateCode) {
+      console.warn('BOM: location not in Australia, skipping');
+      return null;
     }
 
-    if (!stations.length) return null;
+    const productId = BOM_STATE_PRODUCTS[stateCode];
+    if (!productId) return null;
 
-    // Improved station search
-    const locName = (document.getElementById('loc-name').textContent || '').toLowerCase().split(',')[0].trim();
-    let bestMatch = null;
-    let bestScore = -1;
+    // ── 2. Fetch the BOM state observation station list ───────────────────
+    // BOM exposes a stations list for each product as part of their fwo system.
+    // We fetch the JSON index which lists all stations with their IDs.
+    const stationListUrl = `https://corsproxy.io/?url=${encodeURIComponent(
+      `http://www.bom.gov.au/fwo/${productId}/`
+    )}`;
 
-    for (const station of stations) {
-      const name = (station.stn_name || '').toLowerCase();
-      const state = (station.state || '').toLowerCase();
-      let score = 0;
-      if (name.includes(locName) || locName.includes(name.split(' ')[0])) score += 15;
-      if (state && locName.includes(state)) score += 8;
-      // Prefer major stations
-      if ((station.stn_name || '').includes('AWS') || (station.stn_name || '').includes('Airport')) score += 5;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = station;
+    const listRes = await fetch(stationListUrl, { signal: AbortSignal.timeout(8000) });
+    if (!listRes.ok) throw new Error(`BOM station list HTTP ${listRes.status}`);
+    const listHtml = await listRes.text();
+
+    // Parse the directory listing for station JSON files: ProductID.NNNNNNN.json
+    const filePattern = new RegExp(`${productId}\\.(\\d+)\\.json`, 'g');
+    const stationIds = [...new Set([...listHtml.matchAll(filePattern)].map(m => m[1]))];
+
+    if (!stationIds.length) throw new Error('No BOM station files found in directory');
+
+    // ── 3. Fetch each station's metadata to find the nearest one ─────────
+    // BOM JSON observation files have lat/lon in the header.
+    // To avoid fetching all ~200 files, we use a known BOM station-metadata
+    // endpoint that returns lat/lon for each station ID in the product.
+    // Strategy: fetch up to 5 candidate files at once and pick the closest.
+    // We sample every Nth file to find the closest without fetching them all.
+    const SAMPLE_SIZE = 15;
+    const step = Math.max(1, Math.floor(stationIds.length / SAMPLE_SIZE));
+    const sampled = stationIds.filter((_, i) => i % step === 0).slice(0, SAMPLE_SIZE);
+
+    let bestStation = null;
+    let bestDist = Infinity;
+
+    const sampleResults = await Promise.allSettled(sampled.map(async stnId => {
+      const url = `https://corsproxy.io/?url=${encodeURIComponent(
+        `http://www.bom.gov.au/fwo/${productId}/${productId}.${stnId}.json`
+      )}`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const header = j?.observations?.header?.[0];
+      if (!header) return null;
+      const sLat = parseFloat(header.latitude);
+      const sLon = parseFloat(header.longitude);
+      if (isNaN(sLat) || isNaN(sLon)) return null;
+      const dist = haversineKm(lat, lon, sLat, sLon);
+      return { stnId, header, data: j.observations.data, dist };
+    }));
+
+    for (const r of sampleResults) {
+      if (r.status !== 'fulfilled' || !r.value) continue;
+      if (r.value.dist < bestDist) {
+        bestDist = r.value.dist;
+        bestStation = r.value;
       }
     }
 
-    if (!bestMatch || !bestMatch.product_id || !bestMatch.wmo_id) return null;
+    if (!bestStation) throw new Error('No BOM stations returned valid data');
+    console.log(`BOM: nearest station "${bestStation.header.name}" (${bestDist.toFixed(1)} km)`);
 
-    const prodId = bestMatch.product_id;
-    const wmo = bestMatch.wmo_id;
-    const jsonUrl = `https://bom.gov.au${prodId}/${prodId}.${wmo}.json`;
-
-    // Fetch the actual station data
-    const dataRes = await fetch(jsonUrl);
-    if (!dataRes.ok) throw new Error('BOM data fetch failed');
-    const bomData = await dataRes.json();
-
-    // Parse BOM JSON into actualData format (hourly/daily)
-    // BOM structure varies; extract observations
-    const hourly = { time: [], temperature_2m: [], precipitation: [], cloudcover: [] };
-    const daily = { time: [], temperature_2m_max: [], temperature_2m_min: [], precipitation_sum: [] };
-
-    // Example parsing - adapt based on actual BOM JSON structure
-    if (bomData.observations?.data) {
-      bomData.observations.data.forEach(obs => {
-        if (obs.local_date_time_full) {
-          const t = obs.local_date_time_full.replace(/(\d{4})(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:00');
-          hourly.time.push(t);
-          hourly.temperature_2m.push(obs.air_temp || null);
-          hourly.precipitation.push(obs.rain_trace || 0); // or precip
-          // Cloud may not be directly available
-        }
-      });
+    // If nearest from sample is > 100km, likely wrong state — fall back
+    if (bestDist > 100) {
+      console.warn(`BOM: nearest station ${bestDist.toFixed(0)} km away — too far, falling back`);
+      return null;
     }
 
-    // Aggregate daily if possible
-    // ... (simplified for now)
+    // ── 4. Parse observations into actualData format ──────────────────────
+    const obs = bestStation.data || [];
+    // BOM returns observations newest-first; sort to chronological
+    obs.sort((a, b) => (a.local_date_time_full || '').localeCompare(b.local_date_time_full || ''));
 
-    return { hourly, daily, source: 'BOM' };
+    const hourly = { time: [], temperature_2m: [], precipitation: [], cloudcover: [] };
+    const byDate = {};
+
+    for (const o of obs) {
+      const raw = o.local_date_time_full; // e.g. "20240621133000"
+      if (!raw || raw.length < 12) continue;
+      // Format: YYYYMMDDHHmmss  →  YYYY-MM-DDTHH:mm
+      const isoTime = `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}T${raw.slice(8,10)}:00`;
+
+      const temp = (o.air_temp != null && o.air_temp !== '-') ? parseFloat(o.air_temp) : null;
+      const rain = parseBomRain(o.rain_trace);
+
+      hourly.time.push(isoTime);
+      hourly.temperature_2m.push(isNaN(temp) ? null : temp);
+      hourly.precipitation.push(rain);
+      hourly.cloudcover.push(null); // BOM obs don't reliably include cloud cover
+
+      // Accumulate daily stats
+      const dateKey = isoTime.slice(0, 10);
+      if (!byDate[dateKey]) byDate[dateKey] = { temps: [], precip: 0 };
+      if (!isNaN(temp) && temp != null) byDate[dateKey].temps.push(temp);
+      byDate[dateKey].precip += rain;
+    }
+
+    // Build daily arrays
+    const daily = {
+      time: [], temperature_2m_max: [], temperature_2m_min: [], precipitation_sum: []
+    };
+    for (const d of Object.keys(byDate).sort()) {
+      daily.time.push(d);
+      const ts = byDate[d].temps;
+      daily.temperature_2m_max.push(ts.length ? Math.max(...ts) : null);
+      daily.temperature_2m_min.push(ts.length ? Math.min(...ts) : null);
+      daily.precipitation_sum.push(byDate[d].precip);
+    }
+
+    console.log(`BOM: parsed ${hourly.time.length} observations for "${bestStation.header.name}"`);
+    return { hourly, daily, source: 'BOM', stationName: bestStation.header.name };
+
   } catch (e) {
     console.warn('BOM actuals fetch failed:', e.message);
     return null;
@@ -1494,7 +1590,6 @@ function renderVertical_cellVal(colId,i,onlyEnabled,actMap,nowMs,ref){
       const v=ai!==undefined?actualData.hourly.precipitation?.[ai]:null;
       return`<td class="${v!=null?rainCls(v):''}">${v!=null?(v<0.05?'<span class="empty">0</span>':v.toFixed(1)):'–'}</td>`;
     }
-    case'cloud':{const v=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.cloudcover?.[i]??null})));return`<td class="${cloudCls(v)}">${v!=null?Math.round(v)+'%':'—'}</td>`;}
     case'cloud':{
       const v=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.cloudcover?.[i]??null})));
       return`<td class="${cloudCls(v)}">${v!=null?Math.round(v)+'%':'—'}</td>`;
