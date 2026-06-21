@@ -1233,32 +1233,61 @@ async function fetchBOMActuals() {
     }
 
     // ── 4. Parse observations into actualData format ──────────────────────
+    // BOM obs arrive every 30 min. We snap each to the nearest hour so that
+    // the actMap lookup matches model hourly timestamps (YYYY-MM-DDTHH:00).
+    // When two obs snap to the same hour, the later one (closer to the hour
+    // boundary) wins, giving the most representative reading.
     const obs = bestStation.data || [];
-    // BOM returns observations newest-first; sort to chronological
+    // Sort chronologically (BOM returns newest-first)
     obs.sort((a, b) => (a.local_date_time_full || '').localeCompare(b.local_date_time_full || ''));
 
-    const hourly = { time: [], temperature_2m: [], precipitation: [], cloudcover: [] };
-    const byDate = {};
+    // Bucket obs by snapped hour key; last obs in bucket wins
+    const byHour = {}; // "YYYY-MM-DDTHH:00" -> obs
+    const byDate = {}; // "YYYY-MM-DD" -> { temps:[], precip:0 }
 
     for (const o of obs) {
-      const raw = o.local_date_time_full; // e.g. "20240621133000"
+      const raw = o.local_date_time_full; // e.g. "20260621090000" or "20260621093000"
       if (!raw || raw.length < 12) continue;
-      // Format: YYYYMMDDHHmmss  →  YYYY-MM-DDTHH:mm
-      const isoTime = `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}T${raw.slice(8,10)}:00`;
 
-      const temp = (o.air_temp != null && o.air_temp !== '-') ? parseFloat(o.air_temp) : null;
-      const rain = parseBomRain(o.rain_trace);
+      const yr  = raw.slice(0,4), mo = raw.slice(4,6), dy = raw.slice(6,8);
+      const hr  = parseInt(raw.slice(8,10),10);
+      const min = parseInt(raw.slice(10,12),10);
 
-      hourly.time.push(isoTime);
-      hourly.temperature_2m.push(isNaN(temp) ? null : temp);
-      hourly.precipitation.push(rain);
-      hourly.cloudcover.push(null); // BOM obs don't reliably include cloud cover
+      // Snap to nearest hour: minutes >= 30 round up
+      let snapHr = min >= 30 ? hr + 1 : hr;
+      let snapDy = dy, snapMo = mo, snapYr = yr;
+      if (snapHr >= 24) {
+        // Roll over to next day
+        const dt = new Date(`${yr}-${mo}-${dy}T00:00`);
+        dt.setDate(dt.getDate() + 1);
+        snapYr = String(dt.getFullYear());
+        snapMo = String(dt.getMonth()+1).padStart(2,'0');
+        snapDy = String(dt.getDate()).padStart(2,'0');
+        snapHr = 0;
+      }
+      const snapKey = `${snapYr}-${snapMo}-${snapDy}T${String(snapHr).padStart(2,'0')}:00`;
 
-      // Accumulate daily stats
-      const dateKey = isoTime.slice(0, 10);
+      // Later obs in the same bucket overwrite earlier (closer to the hour)
+      byHour[snapKey] = o;
+
+      // Daily accumulation uses the raw hour (not snapped) to avoid double-counting
+      const dateKey = `${yr}-${mo}-${dy}`;
       if (!byDate[dateKey]) byDate[dateKey] = { temps: [], precip: 0 };
-      if (!isNaN(temp) && temp != null) byDate[dateKey].temps.push(temp);
-      byDate[dateKey].precip += rain;
+      const temp = (o.air_temp != null && String(o.air_temp).trim() !== '') ? parseFloat(o.air_temp) : null;
+      if (temp != null && !isNaN(temp)) byDate[dateKey].temps.push(temp);
+      byDate[dateKey].precip += parseBomRain(o.rain_trace);
+    }
+
+    // Build sorted hourly arrays from snapped buckets
+    const hourly = { time: [], temperature_2m: [], precipitation: [], cloudcover: [] };
+    for (const key of Object.keys(byHour).sort()) {
+      const o = byHour[key];
+      const temp = (o.air_temp != null && String(o.air_temp).trim() !== '') ? parseFloat(o.air_temp) : null;
+      const rain = parseBomRain(o.rain_trace);
+      hourly.time.push(key);
+      hourly.temperature_2m.push((temp != null && !isNaN(temp)) ? temp : null);
+      hourly.precipitation.push(rain);
+      hourly.cloudcover.push(null); // BOM obs don't include cloud cover
     }
 
     // Build daily arrays
@@ -1273,7 +1302,7 @@ async function fetchBOMActuals() {
       daily.precipitation_sum.push(byDate[d].precip);
     }
 
-    console.log(`BOM: parsed ${hourly.time.length} observations for "${bestStation.header.name}"`);
+    console.log(`BOM: ${hourly.time.length} hourly slots from "${bestStation.header.name}" (${bestDist.toFixed(1)} km)`);
     return { hourly, daily, source: 'BOM', stationName: bestStation.header.name };
 
   } catch (e) {
@@ -1284,59 +1313,27 @@ async function fetchBOMActuals() {
 
 async function fetchActualsAndComputeWeights(){
   try{
-    // Primary: Try BOM for Australia-focused accurate actuals
-    let bomActuals = null;
+    // BOM observations only — no Open-Meteo or Google fallback.
+    // If BOM is unavailable, actualData stays null and actual rows show dashes.
+    actualData = null;
     if (state.lat && state.lon) {
-      bomActuals = await fetchBOMActuals();
+      actualData = await fetchBOMActuals();
     }
-
-    let baseActuals;
-    if (bomActuals) {
-      baseActuals = bomActuals;
-      console.log('Using BOM actuals data');
+    if (actualData) {
+      console.log(`BOM actuals loaded: ${actualData.stationName || 'unknown station'}, ${actualData.hourly.time.length} obs`);
     } else {
-      // Fallback to Open-Meteo Historical Forecast
-      const endDate=new Date(); endDate.setDate(endDate.getDate()+1);
-      const startDate=new Date(); startDate.setDate(startDate.getDate()-7);
-      const fmt=d=>d.toISOString().slice(0,10);
-
-      const url=`https://historical-forecast-api.open-meteo.com/v1/forecast`
-        +`?latitude=${state.lat}&longitude=${state.lon}`
-        +`&hourly=temperature_2m,precipitation,cloudcover`
-        +`&daily=temperature_2m_max,temperature_2m_min,precipitation_sum`
-        +`&start_date=${fmt(startDate)}&end_date=${fmt(endDate)}`
-        +`&timezone=auto&wind_speed_unit=kmh`;
-
-      const res=await fetch(url);
-      if(!res.ok)throw new Error(`Historical API ${res.status}`);
-      const json=await res.json();
-      if(json.error)throw new Error(json.reason);
-
-      baseActuals = {
-        hourly:{
-          time:[...(json.hourly?.time||[])],
-          temperature_2m:[...(json.hourly?.temperature_2m||[])],
-          precipitation:[...(json.hourly?.precipitation||[])],
-          cloudcover:[...(json.hourly?.cloudcover||[])]
-        },
-        daily:{
-          time:[...(json.daily?.time||[])],
-          temperature_2m_max:[...(json.daily?.temperature_2m_max||[])],
-          temperature_2m_min:[...(json.daily?.temperature_2m_min||[])],
-          precipitation_sum:[...(json.daily?.precipitation_sum||[])]
-        }
-      };
+      console.log('BOM actuals unavailable — actual rows will show dashes');
     }
-
-    actualData = baseActuals;
-
-    // Merge Google's recent hours on top (fills today's gap)
-    await fetchGoogleTodayActuals();
 
     const activeMods=activeEnabled();
     if(!activeMods.length)return;
 
-    // ... rest of weighting logic remains the same
+    // If no actuals, skip weight computation — use equal weights
+    if (!actualData) {
+      activeMods.forEach(m=>{ modelWeights[m.key]=1/activeMods.length; });
+      return;
+    }
+
     const actTimes=actualData.hourly.time || [];
     const actTemps=actualData.hourly.temperature_2m || [];
     const actRain=actualData.hourly.precipitation || [];
