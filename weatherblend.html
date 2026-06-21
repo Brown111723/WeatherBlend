@@ -1141,11 +1141,10 @@ async function fetchBOMActuals() {
   try {
     const lat = state.lat, lon = state.lon;
 
-    // ── 1. Fetch stations.txt ─────────────────────────────────────────────
-    setStatus('spin', 'BOM: fetching station list…');
-    const stUrl = PROXY + encodeURIComponent('http://www.bom.gov.au/climate/data/lists_by_element/stations.txt');
-    const stRes = await fetch(stUrl, { signal: AbortSignal.timeout(12000) });
-    if (!stRes.ok) throw new Error(`stations.txt HTTP ${stRes.status}`);
+    // ── 1. Load local stations.txt (same directory as this HTML) ───────────
+    setStatus('spin', 'BOM: reading station list…');
+    const stRes = await fetch('stations.txt', { signal: AbortSignal.timeout(8000) });
+    if (!stRes.ok) throw new Error(`stations.txt not found (${stRes.status}) — place stations.txt in the same folder as this HTML`);
     const stText = await stRes.text();
 
     // ── 2. Parse fixed-width format ───────────────────────────────────────
