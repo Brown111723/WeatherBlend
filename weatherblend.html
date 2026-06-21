@@ -389,7 +389,7 @@ const MODELS = [
   { key:'ecmwf_ifs025',      ep:'/v1/ecmwf',    label:'ECMWF', short:'E', color:'#059669', desc:'ECMWF · 0.25°'             },
   { key:'icon_seamless',     ep:'/v1/forecast', label:'ICON',  short:'I', color:'#16a34a', desc:'DWD · Germany'             },
   { key:'gem_seamless',      ep:'/v1/forecast', label:'GEM',   short:'C', color:'#7c3aed', desc:'Env. Canada'               },
-  { key:'bom_access_global', ep:'/v1/bom',      label:'BOM-G', short:'B', color:'#b45309', desc:'BOM ACCESS-G · Open-Meteo' },
+  { key:'bom_access_global', ep:'/v1/forecast', label:'BOM-G', short:'B', color:'#b45309', desc:'BOM ACCESS-G · Open-Meteo' },
   { key:'bom_forecast',      ep:'bom',          label:'BOM',   short:'b', color:'#f97316', desc:'BOM Hourly Forecast · Official API', bomFcst:true },
   { key:'ukmo_seamless',     ep:'/v1/forecast', label:'UKMO',  short:'U', color:'#dc2626', desc:'Met Office · UK'           },
   { key:'cma_grapes_global', ep:'/v1/forecast', label:'CMA',   short:'X', color:'#d97706', desc:'CMA · China'               },
@@ -1134,10 +1134,18 @@ const BOM_STATE_PROD = {
   SA:'IDS60801',  WA:'IDW60801',  TAS:'IDT60801', NT:'IDD60801'
 };
 
-// BOM fwo JSON and api.weather.bom.gov.au both support CORS (Access-Control-Allow-Origin: *)
-// so we fetch them directly — no proxy needed.
+// BOM fwo JSON is CORS-blocked from non-BOM origins.
+// api.weather.bom.gov.au supports direct CORS fetches.
+// We try direct first; if blocked fall back to codetabs proxy.
 async function proxyFetch(url, timeoutMs = 10000) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  // Direct fetch first (works for api.weather.bom.gov.au)
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs / 2) });
+    if (res.ok) return res;
+  } catch(e) { /* fall through to proxy */ }
+  // Fallback: codetabs CORS proxy (free, no key required)
+  const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res;
 }
@@ -1182,13 +1190,12 @@ async function fetchBOMActuals() {
       const sLon = parseFloat(coords[2]);
       if (isNaN(sLat) || isNaN(sLon)) continue;
 
-      // WMO: last token on the line (Y/N AWS flag is second-last if present)
-      // Line ends like: "... 99 Y  95719" or "... 99 N" (no WMO)
-      const tokens = line.trim().split(/\s+/);
-      const lastTok = tokens[tokens.length - 1];
-      // WMO numbers are 4-6 digit integers; "Y" or "N" are AWS flags
-      if (!/^\d{4,6}$/.test(lastTok)) continue; // no valid WMO → skip
-      const wmo = lastTok; // use WMO exactly as in stations.txt (e.g. '95719', not '095719')
+      // WMO: appears AFTER the Y/N AWS flag at end of line
+      // Pattern: "... <years> <pct> Y <wmo>" or "... <years> <pct> N" (no WMO)
+      // Anchor on Y/N flag to avoid mistaking % or years for WMO
+      const wmoMatch = line.match(/\s+Y\s+(\d{4,6})\s*$/);
+      if (!wmoMatch) continue; // no Y flag + WMO = skip this station
+      const wmo = wmoMatch[1]; // raw WMO e.g. '95719' — do NOT pad
 
       const dist = haversineKm(lat, lon, sLat, sLon);
       if (dist < bestDist) {
@@ -1295,6 +1302,7 @@ async function fetchBOMForecast(model) {
     const locJson = await locRes.json();
     const locations = locJson?.data;
     if (!Array.isArray(locations) || !locations.length) throw new Error('No location results');
+    console.log('BOM location API first result:', JSON.stringify(locations[0]));
 
     // Pick the result closest to our known lat/lon
     let bestLoc = locations[0];
@@ -1302,9 +1310,10 @@ async function fetchBOMForecast(model) {
     for (const loc of locations) {
       if (!loc.geohash) continue;
       // BOM locations have lat/lon in the response
-      const lLat = loc.latitude  ?? loc.lat;
-      const lLon = loc.longitude ?? loc.lon;
-      if (lLat == null || lLon == null) continue;
+      // BOM location API may nest coords or use different field names
+      const lLat = loc.latitude ?? loc.lat ?? loc.geolocation?.latitude;
+      const lLon = loc.longitude ?? loc.lon ?? loc.geolocation?.longitude;
+      if (lLat == null || lLon == null) { bestLoc = bestLoc || loc; continue; }
       const d = haversineKm(state.lat, state.lon, parseFloat(lLat), parseFloat(lLon));
       if (d < bestDist) { bestDist = d; bestLoc = loc; }
     }
