@@ -375,25 +375,30 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
   No API key required. Auto-refreshes hourly.
 </div>
 
-<div id="debug-panel" style="margin:8px 14px 24px;padding:10px 12px;background:#0b0b0f;border:1px solid #333;border-radius:8px;font-family:monospace;font-size:11px;line-height:1.5;color:#9fe6a0;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-    <strong style="color:#ddd">Debug log</strong>
-    <button onclick="document.getElementById('debug-lines').textContent='';" style="background:#222;color:#aaa;border:1px solid #444;border-radius:5px;padding:2px 8px;font-size:11px">clear</button>
+<div id="debug-panel" style="position:fixed;left:6px;right:6px;bottom:6px;z-index:99999;background:rgba(8,8,12,0.94);border:1px solid #555;border-radius:8px;font-family:monospace;font-size:11px;line-height:1.5;color:#9fe6a0;display:flex;flex-direction:column;max-height:40vh;backdrop-filter:blur(4px)">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid #333;flex:0 0 auto">
+    <strong style="color:#eee">🐞 Debug log</strong>
+    <span style="display:flex;gap:6px">
+      <button onclick="document.getElementById('debug-lines').textContent='';" style="background:#222;color:#bbb;border:1px solid #444;border-radius:5px;padding:2px 8px;font-size:11px">clear</button>
+      <button onclick="var b=document.getElementById('debug-lines');b.style.display=(b.style.display==='none'?'block':'none');this.textContent=(b.style.display==='none'?'show':'hide');" style="background:#222;color:#bbb;border:1px solid #444;border-radius:5px;padding:2px 8px;font-size:11px">hide</button>
+    </span>
   </div>
-  <div id="debug-lines"></div>
+  <div id="debug-lines" style="padding:8px 10px;overflow:auto;white-space:pre-wrap;word-break:break-word;flex:1 1 auto"></div>
 </div>
 
 <script>
 // ══════════════════════════════════════════
-// ON-PAGE DEBUG LOGGER (mirrors console to the panel under the footer)
+// ON-PAGE DEBUG LOGGER (fixed panel at bottom of screen)
 // ══════════════════════════════════════════
+let _dbgBuffer=[];
 function dbg(msg){
   try{
-    const el=document.getElementById('debug-lines');
     const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     const line='['+t+'] '+msg;
-    if(el){ el.textContent += (el.textContent?'\n':'') + line; }
     console.log(line);
+    _dbgBuffer.push(line);
+    const el=document.getElementById('debug-lines');
+    if(el){ el.textContent=_dbgBuffer.join('\n'); el.scrollTop=el.scrollHeight; }
   }catch(e){}
 }
 window.addEventListener('error', ev=>{
@@ -402,6 +407,8 @@ window.addEventListener('error', ev=>{
 window.addEventListener('unhandledrejection', ev=>{
   dbg('❌ PROMISE REJECTION: '+(ev.reason&&ev.reason.message?ev.reason.message:ev.reason));
 });
+window.addEventListener('DOMContentLoaded', ()=>{ dbg('page loaded — debug logger ready'); });
+dbg('script started');
 
 // ══════════════════════════════════════════
 // MODELS — Open-Meteo forecast models.
@@ -430,6 +437,7 @@ let modelWeights = {};             // key -> weight 0-1 (sum=1 across enabled mo
 let useWeightedAvg = true;         // toggled by config panel
 let verticalLayout = false;
 let actualData = null;             // BOM observation actuals for the past days
+let manualLocationOverride = false; // set when user picks a city by hand this session
 
 let state = { lat:null, lon:null, data:{}, status:{}, view:'1h', ss:{} };
 let autoRefreshTimer=null, nextRefreshAt=null;
@@ -535,7 +543,7 @@ function toggleSection(sec,btn){
 function scheduleAutoRefresh(){
   if(autoRefreshTimer)clearTimeout(autoRefreshTimer);
   nextRefreshAt=Date.now()+AUTO_MS;
-  autoRefreshTimer=setTimeout(fetchAllModels,AUTO_MS);
+  autoRefreshTimer=setTimeout(refreshWithLocation,AUTO_MS);
   updateAutoLabel();
 }
 function updateAutoLabel(){
@@ -549,50 +557,76 @@ function updateAutoLabel(){
 async function getLocation(){
   setStatus('spin','Detecting location…');
 
-  // 1. Check localStorage for a saved location first (persists across sessions)
+  // Try GPS FIRST so the app follows you to another city automatically.
+  // Falls back to a saved location, then a manual city prompt.
+  const inIframe = (() => { try { return window.self !== window.top; } catch(e){ return true; } })();
+
+  if(inIframe){
+    dbg('in iframe — GPS blocked, using saved/manual');
+    return fallbackLocation();
+  }
+  if(!navigator.geolocation){
+    dbg('geolocation API unavailable — using saved/manual');
+    return fallbackLocation();
+  }
+
+  // Avoid a silent failure if permission was previously denied
+  if(navigator.permissions){
+    try{
+      const perm = await navigator.permissions.query({name:'geolocation'});
+      if(perm.state==='denied'){
+        dbg('GPS permission denied — using saved/manual');
+        return fallbackLocation();
+      }
+    }catch{}
+  }
+
+  dbg('requesting GPS position…');
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
+      dbg(`GPS ok: ${state.lat.toFixed(3)}, ${state.lon.toFixed(3)}`);
+      reverseGeocode(state.lat,state.lon);
+      fetchAllModels();
+    },
+    err=>{
+      dbg('GPS failed ('+(err.message||err.code)+') — using saved/manual');
+      fallbackLocation();
+    },
+    {timeout:10000, maximumAge:600000, enableHighAccuracy:false}
+  );
+}
+
+// Saved location -> manual prompt
+function fallbackLocation(){
   const saved = loadSavedLocation();
   if(saved){
     state.lat=saved.lat; state.lon=saved.lon;
     document.getElementById('loc-name').textContent=saved.name;
+    dbg('using saved location: '+saved.name);
     fetchAllModels();
-    return;
-  }
-
-  // 2. Detect sandboxed iframe (Claude preview, etc.) — GPS is always blocked there.
-  //    Try to detect by checking if we're in an iframe with a different origin,
-  //    or if the Permissions API says geolocation is denied before we even ask.
-  const inIframe = (() => { try { return window.self !== window.top; } catch(e){ return true; } })();
-  if(inIframe){
-    showCityPrompt('Enter your city name to get started:');
-    return;
-  }
-
-  // 3. Try browser GPS — this is the ONLY way to get true location on PC
-  if(navigator.geolocation){
-    // Check permission state first if Permissions API available (avoids silent denial)
-    if(navigator.permissions){
-      try{
-        const perm = await navigator.permissions.query({name:'geolocation'});
-        if(perm.state==='denied'){
-          showCityPrompt('Location access is blocked. Enter your city:');
-          return;
-        }
-      }catch{}
-    }
-    navigator.geolocation.getCurrentPosition(
-      pos=>{
-        state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
-        reverseGeocode(state.lat,state.lon);
-        fetchAllModels();
-      },
-      err=>{
-        askUserForCity('Could not detect location. Please enter your city:');
-      },
-      {timeout:10000, maximumAge:600000, enableHighAccuracy:false}
-    );
   } else {
-    askUserForCity('Please enter your city name:');
+    dbg('no saved location — prompting for city');
+    showCityPrompt('Enter your city name to get started:');
   }
+}
+
+// Hourly refresh: re-check GPS (in case you've moved), then refetch.
+function refreshWithLocation(){
+  dbg('--- hourly refresh ---');
+  if(manualLocationOverride){ dbg('manual city set this session — skipping GPS re-check'); fetchAllModels(); return; }
+  const inIframe = (() => { try { return window.self !== window.top; } catch(e){ return true; } })();
+  if(inIframe || !navigator.geolocation){ fetchAllModels(); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const moved = state.lat==null || Math.abs(pos.coords.latitude-state.lat)>0.02 || Math.abs(pos.coords.longitude-state.lon)>0.02;
+      state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
+      if(moved){ dbg('location changed on refresh — updating'); reverseGeocode(state.lat,state.lon); }
+      fetchAllModels();
+    },
+    err=>{ dbg('refresh GPS failed — keeping current location'); fetchAllModels(); },
+    {timeout:10000, maximumAge:300000, enableHighAccuracy:false}
+  );
 }
 
 function loadSavedLocation(){
@@ -682,6 +716,8 @@ async function geocodeCity(name){
     const locName=parts.join(', ');
     document.getElementById('loc-name').textContent=locName;
     saveLocation(state.lat,state.lon,locName);
+    manualLocationOverride=true; // keep this city for the session, even on hourly refresh
+    dbg('manual city selected: '+locName);
     fetchAllModels();
   }catch(e){
     console.warn('Geocode failed:',e);
@@ -974,8 +1010,8 @@ function parseBomRain(val){
 async function bomFetch(url, asText){
   const attempts=[
     {u:url, name:'direct'},
-    {u:'https://corsproxy.io/?url='+encodeURIComponent(url), name:'corsproxy'},
-    {u:'https://api.allorigins.win/raw?url='+encodeURIComponent(url), name:'allorigins'}
+    {u:'https://api.allorigins.win/raw?url='+encodeURIComponent(url), name:'allorigins'},
+    {u:'https://corsproxy.io/?url='+encodeURIComponent(url), name:'corsproxy'}
   ];
   let lastErr=null;
   for(const a of attempts){
