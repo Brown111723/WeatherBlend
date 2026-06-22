@@ -375,7 +375,34 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
   No API key required. Auto-refreshes hourly.
 </div>
 
+<div id="debug-panel" style="margin:8px 14px 24px;padding:10px 12px;background:#0b0b0f;border:1px solid #333;border-radius:8px;font-family:monospace;font-size:11px;line-height:1.5;color:#9fe6a0;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <strong style="color:#ddd">Debug log</strong>
+    <button onclick="document.getElementById('debug-lines').textContent='';" style="background:#222;color:#aaa;border:1px solid #444;border-radius:5px;padding:2px 8px;font-size:11px">clear</button>
+  </div>
+  <div id="debug-lines"></div>
+</div>
+
 <script>
+// ══════════════════════════════════════════
+// ON-PAGE DEBUG LOGGER (mirrors console to the panel under the footer)
+// ══════════════════════════════════════════
+function dbg(msg){
+  try{
+    const el=document.getElementById('debug-lines');
+    const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const line='['+t+'] '+msg;
+    if(el){ el.textContent += (el.textContent?'\n':'') + line; }
+    console.log(line);
+  }catch(e){}
+}
+window.addEventListener('error', ev=>{
+  dbg('❌ JS ERROR: '+(ev.message||'')+' @ '+((ev.filename||'').split('/').pop())+':'+ev.lineno);
+});
+window.addEventListener('unhandledrejection', ev=>{
+  dbg('❌ PROMISE REJECTION: '+(ev.reason&&ev.reason.message?ev.reason.message:ev.reason));
+});
+
 // ══════════════════════════════════════════
 // MODELS — Open-Meteo forecast models.
 // BOM is used separately as the "actual" (observation) source, not a blended model.
@@ -666,6 +693,7 @@ async function geocodeCity(name){
 // FETCH
 // ══════════════════════════════════════════
 async function fetchAllModels(){
+  dbg(`=== fetchAllModels: lat=${state.lat}, lon=${state.lon} ===`);
   state.data={};state.status={};state.ss={};
   // Reset autoHidden and re-enable all models so a city change / refresh starts clean
   autoHidden.clear();
@@ -707,20 +735,33 @@ async function fetchAllModels(){
   });
 
   const ok=MODELS.filter(m=>state.status[m.key]==='ok').length;
-  if(!ok){showErr('All models failed.');setStatus('err','No data');return;}
+  dbg(`models loaded: ${ok}/${MODELS.length} ok`);
+  if(!ok){showErr('All models failed.');setStatus('err','No data');dbg('❌ all models failed — aborting');return;}
   document.getElementById('err-area').innerHTML='';
   const failed=MODELS.filter(m=>state.status[m.key]==='fail').map(m=>m.label);
   const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   setStatus('ok',`${ok}/${MODELS.length} models · ${t}${failed.length?' · unavail: '+failed.join(', '):''}`);
 
-  // Build caches, fetch actuals, compute weights, then render
-  buildForecastRainCache();
-  buildHiLoCache();
-  await fetchActualsAndComputeWeights();
-  renderCurrentBar();
-  buildSourcesPanel(); // rebuild to show weight badges
-  scheduleAutoRefresh();
-  renderTable();
+  // Render the table immediately with a simple (equal-weight) average so it
+  // always appears fast. BOM actuals + RMSE weights are then fetched in the
+  // background and the table re-renders once they're ready.
+  try{
+    buildForecastRainCache();
+    buildHiLoCache();
+    renderCurrentBar();
+    buildSourcesPanel();
+    scheduleAutoRefresh();
+    renderTable();
+    dbg('✓ table rendered (equal-weight, pre-actuals)');
+  }catch(e){ dbg('❌ initial render error: '+e.message); }
+
+  // Background: fetch BOM actuals, compute weights, then re-render.
+  dbg('fetching BOM actuals…');
+  fetchActualsAndComputeWeights().then(()=>{
+    dbg('actuals/weights done'+(actualData?(' — '+actualData.source+' '+(actualData.stationName||'')):' — no actuals'));
+    try{ renderCurrentBar(); buildSourcesPanel(); renderTable(); dbg('✓ table re-rendered with weights'); }
+    catch(e){ dbg('❌ re-render error: '+e.message); }
+  }).catch(e=>{ dbg('❌ actuals/weights error: '+e.message); });
 }
 
 // ══════════════════════════════════════════
@@ -932,17 +973,19 @@ function parseBomRain(val){
 // BOM hosts have no CORS headers, so try the direct URL first, then proxies.
 async function bomFetch(url, asText){
   const attempts=[
-    url,
-    'https://corsproxy.io/?url='+encodeURIComponent(url),
-    'https://api.allorigins.win/raw?url='+encodeURIComponent(url)
+    {u:url, name:'direct'},
+    {u:'https://corsproxy.io/?url='+encodeURIComponent(url), name:'corsproxy'},
+    {u:'https://api.allorigins.win/raw?url='+encodeURIComponent(url), name:'allorigins'}
   ];
   let lastErr=null;
-  for(const u of attempts){
+  for(const a of attempts){
     try{
-      const r=await fetch(u, {signal:AbortSignal.timeout(12000)});
+      const r=await fetch(a.u, {signal:AbortSignal.timeout(9000)});
       if(!r.ok)throw new Error('HTTP '+r.status);
-      return asText ? await r.text() : await r.json();
-    }catch(e){ lastErr=e; }
+      const out=asText ? await r.text() : await r.json();
+      dbg('  ✓ fetch ok via '+a.name);
+      return out;
+    }catch(e){ lastErr=e; dbg('  · '+a.name+' failed: '+(e.message||e.name)); }
   }
   throw lastErr||new Error('all fetch attempts failed');
 }
@@ -955,12 +998,13 @@ async function loadBomStations(){
   // 1) local file alongside this page
   try{
     const r=await fetch('stations.txt', {signal:AbortSignal.timeout(8000)});
-    if(r.ok)text=await r.text();
-  }catch(e){ /* fall through to online */ }
+    if(r.ok){text=await r.text();dbg('stations.txt: loaded local file ('+text.length+' chars)');}
+  }catch(e){ dbg('stations.txt: local file not available ('+(e.message||e.name)+')'); }
   // 2) online fallback (reg.bom.gov.au — needs proxy in browsers)
   if(!text){
-    try{ text=await bomFetch('https://reg.bom.gov.au/climate/data/lists_by_element/stations.txt', true); }
-    catch(e){ console.warn('BOM stations.txt unavailable:', e.message); return []; }
+    dbg('stations.txt: trying online fallback…');
+    try{ text=await bomFetch('https://reg.bom.gov.au/climate/data/lists_by_element/stations.txt', true); dbg('stations.txt: online loaded ('+text.length+' chars)'); }
+    catch(e){ dbg('❌ stations.txt unavailable: '+(e.message||e.name)); return []; }
   }
   const lines=text.split(/\r?\n/);
   // Locate the dashed separator; its dash-runs define the fixed-width columns.
@@ -968,7 +1012,7 @@ async function loadBomStations(){
   for(let i=0;i<lines.length;i++){
     if(/-{3,}/.test(lines[i]) && /^[\s-]+$/.test(lines[i])){ sepIdx=i; break; }
   }
-  if(sepIdx<1){ console.warn('BOM stations.txt: column separator not found'); return []; }
+  if(sepIdx<1){ dbg('❌ stations.txt: dashed separator line not found — unexpected format'); return []; }
   const header=lines[sepIdx-1];
   const cols=[]; let mm; const re=/-+/g;
   while((mm=re.exec(lines[sepIdx]))!==null){ cols.push([mm.index, mm.index+mm[0].length]); }
@@ -983,7 +1027,8 @@ async function loadBomStations(){
     else if(l==='wmo')cWmo=i;
     else if(l.includes('site name')||l==='name')cName=i;
   }
-  if(cLat<0||cLon<0||cWmo<0){ console.warn('BOM stations.txt: could not map Lat/Lon/WMO columns'); return []; }
+  dbg(`stations.txt: ${cols.length} cols; header="${header.trim().slice(0,60)}"; Lat=${cLat} Lon=${cLon} STA=${cSta} WMO=${cWmo} Name=${cName}`);
+  if(cLat<0||cLon<0||cWmo<0){ dbg('❌ stations.txt: could not map Lat/Lon/WMO columns from header'); return []; }
   const out=[];
   for(let i=sepIdx+1;i<lines.length;i++){
     const ln=lines[i]; if(!ln||!ln.trim())continue;
@@ -993,7 +1038,7 @@ async function loadBomStations(){
     if(isNaN(lat)||isNaN(lon))continue;
     out.push({ wmo:wmoStr, state:slice(ln,cSta).toUpperCase(), lat, lon, name:slice(ln,cName) });
   }
-  console.log(`BOM stations.txt: parsed ${out.length} WMO stations`);
+  dbg(`stations.txt: parsed ${out.length} WMO stations`);
   bomStationsCache=out;
   return out;
 }
@@ -1051,33 +1096,36 @@ function parseBomObs(json, stn){
 async function fetchBOMActuals(){
   try{
     const lat=state.lat, lon=state.lon;
-    if(lat==null||lon==null)return null;
+    if(lat==null||lon==null){dbg('BOM: no coordinates');return null;}
     const stations=await loadBomStations();
-    if(!stations.length)return null;
+    if(!stations.length){dbg('BOM: station list empty — cannot locate a station');return null;}
     const ranked=stations
       .filter(s=>BOM_STATE_LETTER[s.state])                 // must map to a product ID
       .map(s=>({...s, dist:haversineKm(lat,lon,s.lat,s.lon)}))
       .sort((a,b)=>a.dist-b.dist);
-    if(!ranked.length)return null;
+    if(!ranked.length){dbg('BOM: no stations with a mappable state');return null;}
+    dbg(`BOM: nearest = ${ranked[0].name} (${ranked[0].state} WMO ${ranked[0].wmo}, ${ranked[0].dist.toFixed(0)}km)`);
     // Not every WMO station publishes a live FWO file — try the nearest few.
-    for(const stn of ranked.slice(0,8)){
-      if(stn.dist>250)break;
+    for(const stn of ranked.slice(0,6)){
+      if(stn.dist>250){dbg('BOM: remaining stations >250km away, stopping');break;}
       const productId='ID'+BOM_STATE_LETTER[stn.state]+'60801';
       const url=`https://www.bom.gov.au/fwo/${productId}/${productId}.${stn.wmo}.json`;
+      dbg(`BOM: trying ${productId}.${stn.wmo}.json (${stn.name})`);
       try{
         setStatus('spin', `BOM: ${stn.name||stn.wmo}…`);
         const j=await bomFetch(url, false);
         const parsed=parseBomObs(j, stn);
         if(parsed && parsed.hourly.time.length){
-          console.log(`BOM: ${stn.name} (WMO ${stn.wmo}, ${productId}) — ${stn.dist.toFixed(0)} km, ${parsed.hourly.time.length} hourly slots`);
+          dbg(`BOM: ✓ ${stn.name} — ${parsed.hourly.time.length} hourly obs, last ${parsed.hourly.time[parsed.hourly.time.length-1]}`);
           return parsed;
         }
-      }catch(e){ /* try next-nearest station */ }
+        dbg('BOM: response had no usable observations, trying next');
+      }catch(e){ dbg('BOM: fetch failed ('+(e.message||e.name)+'), trying next'); }
     }
-    console.warn('BOM: no nearby station returned observations');
+    dbg('❌ BOM: no nearby station returned observations');
     return null;
   }catch(e){
-    console.warn('BOM actuals failed:', e.message);
+    dbg('❌ BOM actuals error: '+(e.message||e.name));
     return null;
   }
 }
@@ -1182,6 +1230,7 @@ async function fetchActualsAndComputeWeights(){
 
     console.log('Recency-weighted RMSE:', Object.fromEntries(activeMods.map(m=>[m.label,rmse[m.key]?.toFixed(3)])));
     console.log('Model weights:', Object.fromEntries(activeMods.map(m=>[m.label,(modelWeights[m.key]*100).toFixed(1)+'%'])));
+    dbg('weights: '+activeMods.map(m=>m.label+' '+Math.round((modelWeights[m.key]||0)*100)+'%').join(', '));
 
   }catch(e){
     console.warn('Actuals/weights failed:',e.message);
@@ -1600,6 +1649,8 @@ function renderSkeleton(){
     `</tbody>`;
 }
 function renderTable(){
+  const okModels=MODELS.filter(m=>state.data[m.key]).length;
+  dbg(`renderTable: view=${state.view}, vertical=${verticalLayout}, models-with-data=${okModels}`);
   if(verticalLayout)renderVertical();    // handles all views incl daily
   else if(state.view==='daily')renderDaily();
   else renderHourly();
