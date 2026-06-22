@@ -1010,17 +1010,26 @@ function parseBomRain(val){
 async function bomFetch(url, asText){
   const attempts=[
     {u:url, name:'direct'},
+    {u:'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(url), name:'codetabs'},
     {u:'https://api.allorigins.win/raw?url='+encodeURIComponent(url), name:'allorigins'},
-    {u:'https://corsproxy.io/?url='+encodeURIComponent(url), name:'corsproxy'}
+    {u:'https://thingproxy.freeboard.io/fetch/'+url, name:'thingproxy'}
   ];
   let lastErr=null;
   for(const a of attempts){
     try{
-      const r=await fetch(a.u, {signal:AbortSignal.timeout(9000)});
+      const r=await fetch(a.u, {signal:AbortSignal.timeout(8000)});
       if(!r.ok)throw new Error('HTTP '+r.status);
-      const out=asText ? await r.text() : await r.json();
+      const body=await r.text();
+      if(!asText){
+        // Some proxies return an HTML error page with a 200 — guard against that.
+        const trimmed=body.trim();
+        if(trimmed.startsWith('<'))throw new Error('proxy returned HTML, not JSON');
+        const out=JSON.parse(trimmed);
+        dbg('  ✓ fetch ok via '+a.name);
+        return out;
+      }
       dbg('  ✓ fetch ok via '+a.name);
-      return out;
+      return body;
     }catch(e){ lastErr=e; dbg('  · '+a.name+' failed: '+(e.message||e.name)); }
   }
   throw lastErr||new Error('all fetch attempts failed');
