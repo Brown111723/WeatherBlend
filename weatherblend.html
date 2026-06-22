@@ -1098,6 +1098,28 @@ function parseBomForecast(fJson, offsetSec){
   return {hourly, daily};
 }
 
+// Re-index a parsed {hourly,daily} onto a reference model's time grids, by time
+// key, so the index-based table places each value in the correct column.
+function alignToGrid(src, refData){
+  if(!refData?.hourly?.time) return src;
+  const out={hourly:{}, daily:{}};
+  const refH=refData.hourly.time;
+  const hIdx={}; src.hourly.time.forEach((t,i)=>{ hIdx[t]=i; });
+  out.hourly.time=refH.slice();
+  ['temperature_2m','precipitation','windspeed_10m','winddirection_10m','weathercode','cloudcover'].forEach(f=>{
+    const a=src.hourly[f]||[];
+    out.hourly[f]=refH.map(t=>{ const i=hIdx[t]; return i===undefined?null:(a[i]??null); });
+  });
+  const refD=refData.daily?.time||[];
+  const dIdx={}; (src.daily.time||[]).forEach((t,i)=>{ dIdx[t]=i; });
+  out.daily.time=refD.slice();
+  ['weathercode','temperature_2m_max','temperature_2m_min','precipitation_sum','windspeed_10m_max','winddirection_10m_dominant'].forEach(f=>{
+    const a=src.daily[f]||[];
+    out.daily[f]=refD.map(t=>{ const i=dIdx[t]; return i===undefined?null:(a[i]??null); });
+  });
+  return out;
+}
+
 async function fetchBomForecast(m){
   state.status[m.key]='load'; updatePills();
   try{
@@ -1110,10 +1132,15 @@ async function fetchBomForecast(m){
     const r=await fetch(u,{signal:AbortSignal.timeout(15000)});
     if(!r.ok){ let why=''; try{const j=await r.json(); why=j.error?(' ('+j.error+')'):'';}catch{} throw new Error('worker HTTP '+r.status+why); }
     const j=await r.json();
-    const parsed=parseBomForecast(j.data, locationOffsetSec);
+    let parsed=parseBomForecast(j.data, locationOffsetSec);
     if(!parsed||!parsed.hourly.time.length)throw new Error('no forecast data');
+    // Align BOM's future-only series onto the reference model's grid so the table
+    // places each hour in the right column (otherwise it starts at the first cell).
+    const refModel=MODELS.find(mm=>!mm.bomFc && state.data[mm.key]);
+    const bomStart=parsed.hourly.time[0];
+    if(refModel)parsed=alignToGrid(parsed, state.data[refModel.key]);
     state.data[m.key]=parsed; state.status[m.key]='ok';
-    dbg(`BOM forecast: ✓ ${j.location?.name||name} (${j.geohash||'?'}) — ${parsed.hourly.time.length} hrs`);
+    dbg(`BOM forecast: ✓ ${j.location?.name||name} (${j.geohash||'?'}) — starts ${bomStart}, aligned to grid`);
   }catch(e){
     dbg('❌ BOM forecast failed: '+(e.message||e.name));
     state.status[m.key]='fail'; autoHidden.add(m.key);
