@@ -979,15 +979,20 @@ function isDayStart(iso,prevIso){return prevIso&&iso.slice(0,10)!==prevIso.slice
 // ══════════════════════════════════════════
 // HISTORICAL ACTUALS + MODEL WEIGHT CALC
 // ══════════════════════════════════════════
-// ── BOM OBSERVATIONS — "actual" (past) data source ───────────────────────
-// Station list (WMO numbers + state) from BOM's stations.txt:
-//   local file "stations.txt" (same folder as this page), online fallback
-//   https://reg.bom.gov.au/climate/data/lists_by_element/stations.txt
-// Observations from the per-station FWO JSON:
-//   https://www.bom.gov.au/fwo/<productId>/<productId>.<wmo>.json
-// productId = "ID" + <state letter> + "60801"  (e.g. Dubbo NSW -> IDN60801.95719.json)
+// ── BOM OBSERVATIONS — "actual" (past) data source, via Cloudflare Worker ──
+// Station list (WMO + state + coords) comes from BOM's stations.txt (local file
+// "stations.txt" alongside this page, or the Worker's ?stations=1 fallback).
+// Observations come from the Worker, which fetches the BOM FWO JSON server-side
+// and adds CORS headers (browsers can't fetch bom.gov.au directly).
+//
+// ⬇️⬇️⬇️  PASTE YOUR CLOUDFLARE WORKER URL HERE  ⬇️⬇️⬇️
+//   After `wrangler deploy`, it looks like https://weatherblend-bom.<sub>.workers.dev
+const BOM_WORKER_URL = 'https://weatherblend-bom.YOUR-SUBDOMAIN.workers.dev';
+// ⬆️⬆️⬆️  (no trailing slash)  ⬆️⬆️⬆️
 
-const BOM_STATE_LETTER = { NSW:'N', ACT:'N', VIC:'V', QLD:'Q', SA:'S', WA:'W', TAS:'T', NT:'D' };
+function bomWorkerConfigured(){
+  return BOM_WORKER_URL && !/YOUR-SUBDOMAIN/.test(BOM_WORKER_URL);
+}
 
 function haversineKm(lat1, lon1, lat2, lon2){
   const R=6371, toRad=d=>d*Math.PI/180;
@@ -1006,33 +1011,24 @@ function parseBomRain(val){
   return isNaN(n)?0:n;
 }
 
-// BOM hosts have no CORS headers, so try the direct URL first, then proxies.
-async function bomFetch(url, asText){
-  const attempts=[
-    {u:url, name:'direct'},
-    {u:'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(url), name:'codetabs'},
-    {u:'https://api.allorigins.win/raw?url='+encodeURIComponent(url), name:'allorigins'},
-    {u:'https://thingproxy.freeboard.io/fetch/'+url, name:'thingproxy'}
-  ];
-  let lastErr=null;
-  for(const a of attempts){
-    try{
-      const r=await fetch(a.u, {signal:AbortSignal.timeout(8000)});
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      const body=await r.text();
-      if(!asText){
-        // Some proxies return an HTML error page with a 200 — guard against that.
-        const trimmed=body.trim();
-        if(trimmed.startsWith('<'))throw new Error('proxy returned HTML, not JSON');
-        const out=JSON.parse(trimmed);
-        dbg('  ✓ fetch ok via '+a.name);
-        return out;
-      }
-      dbg('  ✓ fetch ok via '+a.name);
-      return body;
-    }catch(e){ lastErr=e; dbg('  · '+a.name+' failed: '+(e.message||e.name)); }
+// Fetch the BOM observations JSON for a station via the Worker.
+async function bomWorkerObs(wmo, stateAbbr){
+  const u=`${BOM_WORKER_URL}?station=${encodeURIComponent(wmo)}&state=${encodeURIComponent(stateAbbr||'')}`;
+  const r=await fetch(u, {signal:AbortSignal.timeout(15000)});
+  if(!r.ok){
+    // Worker returns 404 JSON when no product had data — read it for the debug log
+    let why=''; try{ const j=await r.json(); why=j.error?(' ('+j.error+(j.tried?' tried '+j.tried.join(','):'')+')'):''; }catch{}
+    throw new Error('worker HTTP '+r.status+why);
   }
-  throw lastErr||new Error('all fetch attempts failed');
+  const j=await r.json();
+  return j.data || j; // Worker wraps BOM JSON as {source,productId,station,data}
+}
+
+// Fetch stations.txt text via the Worker (fallback when no local file).
+async function bomWorkerStations(){
+  const r=await fetch(`${BOM_WORKER_URL}?stations=1`, {signal:AbortSignal.timeout(20000)});
+  if(!r.ok)throw new Error('worker stations HTTP '+r.status);
+  return await r.text();
 }
 
 // Parse BOM stations.txt (fixed-width) -> [{wmo, state, lat, lon, name}]
@@ -1045,11 +1041,16 @@ async function loadBomStations(){
     const r=await fetch('stations.txt', {signal:AbortSignal.timeout(8000)});
     if(r.ok){text=await r.text();dbg('stations.txt: loaded local file ('+text.length+' chars)');}
   }catch(e){ dbg('stations.txt: local file not available ('+(e.message||e.name)+')'); }
-  // 2) online fallback (reg.bom.gov.au — needs proxy in browsers)
+  // 2) online fallback via the Worker (browsers can't fetch reg.bom.gov.au directly)
   if(!text){
-    dbg('stations.txt: trying online fallback…');
-    try{ text=await bomFetch('https://reg.bom.gov.au/climate/data/lists_by_element/stations.txt', true); dbg('stations.txt: online loaded ('+text.length+' chars)'); }
-    catch(e){ dbg('❌ stations.txt unavailable: '+(e.message||e.name)); return []; }
+    if(bomWorkerConfigured()){
+      dbg('stations.txt: no local file — fetching via Worker…');
+      try{ text=await bomWorkerStations(); dbg('stations.txt: Worker loaded ('+text.length+' chars)'); }
+      catch(e){ dbg('❌ stations.txt via Worker failed: '+(e.message||e.name)); return []; }
+    } else {
+      dbg('❌ stations.txt: no local file and Worker URL not set');
+      return [];
+    }
   }
   const lines=text.split(/\r?\n/);
   // Locate the dashed separator; its dash-runs define the fixed-width columns.
@@ -1140,32 +1141,34 @@ function parseBomObs(json, stn){
 
 async function fetchBOMActuals(){
   try{
+    if(!bomWorkerConfigured()){
+      dbg('❌ BOM: Worker URL not set — edit BOM_WORKER_URL in the file. Skipping actuals.');
+      return null;
+    }
     const lat=state.lat, lon=state.lon;
     if(lat==null||lon==null){dbg('BOM: no coordinates');return null;}
     const stations=await loadBomStations();
     if(!stations.length){dbg('BOM: station list empty — cannot locate a station');return null;}
     const ranked=stations
-      .filter(s=>BOM_STATE_LETTER[s.state])                 // must map to a product ID
       .map(s=>({...s, dist:haversineKm(lat,lon,s.lat,s.lon)}))
       .sort((a,b)=>a.dist-b.dist);
-    if(!ranked.length){dbg('BOM: no stations with a mappable state');return null;}
+    if(!ranked.length){dbg('BOM: no stations found');return null;}
     dbg(`BOM: nearest = ${ranked[0].name} (${ranked[0].state} WMO ${ranked[0].wmo}, ${ranked[0].dist.toFixed(0)}km)`);
     // Not every WMO station publishes a live FWO file — try the nearest few.
+    // The Worker figures out the right product ID for each station's state.
     for(const stn of ranked.slice(0,6)){
       if(stn.dist>250){dbg('BOM: remaining stations >250km away, stopping');break;}
-      const productId='ID'+BOM_STATE_LETTER[stn.state]+'60801';
-      const url=`https://www.bom.gov.au/fwo/${productId}/${productId}.${stn.wmo}.json`;
-      dbg(`BOM: trying ${productId}.${stn.wmo}.json (${stn.name})`);
+      dbg(`BOM: trying WMO ${stn.wmo} (${stn.name}, ${stn.state}) via Worker`);
       try{
         setStatus('spin', `BOM: ${stn.name||stn.wmo}…`);
-        const j=await bomFetch(url, false);
+        const j=await bomWorkerObs(stn.wmo, stn.state);
         const parsed=parseBomObs(j, stn);
         if(parsed && parsed.hourly.time.length){
           dbg(`BOM: ✓ ${stn.name} — ${parsed.hourly.time.length} hourly obs, last ${parsed.hourly.time[parsed.hourly.time.length-1]}`);
           return parsed;
         }
-        dbg('BOM: response had no usable observations, trying next');
-      }catch(e){ dbg('BOM: fetch failed ('+(e.message||e.name)+'), trying next'); }
+        dbg('BOM: no usable observations, trying next');
+      }catch(e){ dbg('BOM: '+(e.message||e.name)+' — trying next'); }
     }
     dbg('❌ BOM: no nearby station returned observations');
     return null;
