@@ -164,6 +164,10 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .sec-head-rain td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#90caf9;text-align:left!important;padding-left:20px!important;}
 .sec-head-temp .hilocell,.sec-head-rain .hilocell,.sec-head-wind .hilocell{font-size:12px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
 .icon-row td{text-align:center;padding:4px 3px;font-size:17px;}
+.wx{display:inline-block;vertical-align:-0.18em;width:1.3em;height:1.3em;}
+.icon-row .wx{width:24px;height:24px;}
+.curr-icon .wx{width:46px;height:46px;}
+.wx-dash{opacity:.4;}
 .data-row td{text-align:center;padding:6px 4px;font-size:15px;color:var(--text-primary);min-width:54px;}
 .data-row td.row-label{font-family:'Inter',sans-serif;font-size:14px;}
 .model-badge{display:inline-flex;align-items:center;gap:5px;}
@@ -965,7 +969,8 @@ function renderCurrentBar(){
 
   const windArrow=dirArrow16(windDir??0);
 
-  document.getElementById('curr-icon').textContent=wxIcon(wcode);
+  const currNight = c ? (c.is_day===0) : isNightAt(new Date().toISOString());
+  document.getElementById('curr-icon').innerHTML=wxIcon(wcode,currNight);
   document.getElementById('curr-temp').textContent=temp!=null?`${tempDisp(temp)}°`:'—';
   document.getElementById('curr-hilo').textContent=
     todayHi!=null?`↑${tempDisp(todayHi)}° ↓${todayLo!=null?tempDisp(todayLo)+'°':'—'}`:'—';
@@ -1485,7 +1490,37 @@ function buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,r
     (actCells?`<tr class="actual-row"><td class="row-label" style="color:#c4b5fd">✓ Actual</td>${actCells}</tr>`:"");
 }
 function tempCls(v){if(v==null)return'';if(v<5)return'tc';if(v<12)return'tk';if(v<22)return'tm';if(v<30)return'tw';return'th';}
-function wxIcon(c){if(c==null)return'–';if(c===0)return'☀️';if(c<=2)return'⛅';if(c<=45)return'🌥️';if(c<=55)return'🌦️';if(c<=65)return'🌧️';if(c<=77)return'❄️';if(c<=82)return'🌧️';return'⛈️';}
+// ── SVG weather icons (day/night aware), composed from reusable parts ──
+const _sun='<circle cx="12" cy="12" r="4.6" fill="#fbbf24"/><g stroke="#fbbf24" stroke-width="1.7" stroke-linecap="round"><line x1="12" y1="1.6" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.4"/><line x1="1.6" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.4" y2="12"/><line x1="4.5" y1="4.5" x2="6.2" y2="6.2"/><line x1="17.8" y1="17.8" x2="19.5" y2="19.5"/><line x1="19.5" y1="4.5" x2="17.8" y2="6.2"/><line x1="6.2" y1="17.8" x2="4.5" y2="19.5"/></g>';
+const _moon='<path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5 6.7 6.7 0 0 0 20.5 14.2z" fill="#cbd5e1"/>';
+const _sunSm='<circle cx="8.2" cy="7.6" r="3.1" fill="#fbbf24"/><g stroke="#fbbf24" stroke-width="1.3" stroke-linecap="round"><line x1="8.2" y1="1.8" x2="8.2" y2="3.2"/><line x1="2.4" y1="7.6" x2="3.8" y2="7.6"/><line x1="4.1" y1="3.5" x2="5.1" y2="4.5"/><line x1="12.3" y1="3.5" x2="11.3" y2="4.5"/></g>';
+const _moonSm='<path d="M13.2 7.7A4.5 4.5 0 1 1 7.8 3.1 3.5 3.5 0 0 0 13.2 7.7z" fill="#cbd5e1"/>';
+function _cloud(c){return `<path d="M7 18.5h9.4a3.6 3.6 0 0 0 .42-7.16 5.3 5.3 0 0 0-10.2-1.2A4 4 0 0 0 7 18.5z" fill="${c}"/>`;}
+function _rain(n){const x=[8.5,12,15.5];let s='<g stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round">';for(let i=0;i<n;i++)s+=`<line x1="${x[i]}" y1="19.8" x2="${x[i]-1}" y2="22.6"/>`;return s+'</g>';}
+const _snow='<g fill="#e2e8f0"><circle cx="8.5" cy="20.9" r="1.15"/><circle cx="12" cy="22.1" r="1.15"/><circle cx="15.5" cy="20.9" r="1.15"/></g>';
+const _bolt='<polygon points="12.6,18.4 9.6,22.4 11.7,22.4 10.7,23.8 14,19.7 11.9,19.7 13.4,18.4" fill="#facc15"/>';
+const _fog='<g stroke="#9aa7b8" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="5.5" y1="12" x2="18.5" y2="12"/><line x1="4" y1="16" x2="17" y2="16"/><line x1="7" y1="20" x2="20" y2="20"/></g>';
+
+function wxIcon(c,night){
+  if(c==null)return'<span class="wx-dash">–</span>';
+  const n=!!night, GRAY='#94a3b8', DARK='#6b7a8f';
+  let inner;
+  if(c===0)                 inner=n?_moon:_sun;
+  else if(c===1||c===2)     inner=(n?_moonSm:_sunSm)+_cloud(GRAY);
+  else if(c===3)            inner=_cloud(DARK);
+  else if(c===45||c===48)   inner=_fog;
+  else if(c>=51&&c<=57)     inner=(n?'':_sunSm)+_cloud(GRAY)+_rain(2);
+  else if(c>=61&&c<=65)     inner=_cloud(GRAY)+_rain(3);
+  else if(c===66||c===67)   inner=_cloud(GRAY)+_rain(2);
+  else if(c>=71&&c<=77)     inner=_cloud(GRAY)+_snow;
+  else if(c>=80&&c<=82)     inner=(n?'':_sunSm)+_cloud(GRAY)+_rain(3);
+  else if(c===85||c===86)   inner=(n?'':_sunSm)+_cloud(GRAY)+_snow;
+  else if(c>=95)            inner=_cloud(DARK)+_bolt;
+  else                      inner=_cloud(GRAY);
+  return `<svg class="wx" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+}
+// Is a given ISO hour night-time at this location?
+function isNightAt(iso){ return !isDay(new Date(iso).getTime(), iso.slice(0,10)); }
 function dirArrow(deg){const a=['↑','↗','→','↘','↓','↙','←','↖'],d=['N','NE','E','SE','S','SW','W','NW'];const i=Math.round(((deg%360)+360)%360/45)%8;return`${a[i]} ${d[i]}`;}
 function hVals(key,field,indices){
   const d=state.data[key];if(!d)return indices.map(()=>null);
@@ -1928,7 +1963,7 @@ function renderHourly(){
   }).join('');
 
   const iconKey=onlyEnabled[0]?.key||allActive[0]?.key;
-  const iconCells=hVals(iconKey,'weathercode',indices).map((c,ci)=>{const nc=ci===nowCi?'now-col':'';return injectColCls(`<td class="${[pastCls[ci]||'',nc].filter(Boolean).join(' ')}">${wxIcon(c)}</td>`,ndCls[ci]);}).join('');
+  const iconCells=hVals(iconKey,'weathercode',indices).map((c,ci)=>{const nc=ci===nowCi?'now-col':'';const t=ref.time[indices[ci]];return injectColCls(`<td class="${[pastCls[ci]||'',nc].filter(Boolean).join(' ')}">${wxIcon(c,isNightAt(t))}</td>`,ndCls[ci]);}).join('');
 
   // ── Actual (ERA5) data rows ──
   function buildActualCells(field, indices, fmtFn, clsFn, nowCiRef){
