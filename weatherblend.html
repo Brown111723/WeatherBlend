@@ -32,21 +32,18 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .hdr-right{display:flex;align-items:center;gap:8px;}
 
 /* ── Current conditions bar ── */
-#curr-bar{padding:16px 20px;border-bottom:1px solid var(--border);background:radial-gradient(120% 140% at 0% 0%,#1d2636 0%,#141a26 55%,#11151f 100%);display:none;align-items:center;gap:18px;flex-wrap:wrap;}
+#curr-bar{padding:16px 20px;border-bottom:1px solid var(--border);background:radial-gradient(120% 140% at 0% 0%,#1d2636 0%,#141a26 55%,#11151f 100%);display:none;align-items:stretch;gap:16px;flex-wrap:wrap;}
 #curr-bar.loaded{display:flex;}
-.curr-icon{font-size:40px;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));}
-.curr-temp-block{display:flex;flex-direction:column;gap:1px;}
-.curr-temp{font-size:46px;font-weight:700;letter-spacing:-1.5px;color:var(--text-primary);line-height:1;}
-.curr-hilo{font-size:13px;color:var(--text-muted);margin-top:3px;letter-spacing:.2px;}
-.curr-meta{display:flex;flex-direction:column;gap:2px;}
-.curr-line{font-size:14px;color:var(--text-muted);}
-.curr-line strong{color:var(--text-primary);}
-.curr-synopsis{font-size:14px;color:var(--text-muted);font-style:italic;max-width:240px;line-height:1.4;}
-.curr-divider{width:1px;height:42px;background:linear-gradient(180deg,transparent,var(--border2),transparent);flex-shrink:0;}
-.curr-block{display:flex;flex-direction:column;gap:3px;}
-.curr-lbl{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;}
-.curr-val{font-size:17px;font-weight:600;color:var(--text-primary);}
-.curr-sub{font-size:13px;color:var(--text-muted);}
+.cc-box{display:flex;flex-direction:column;gap:2px;min-width:104px;}
+.cc-title{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:2px;}
+.cc-icon{line-height:1;margin:1px 0 3px;}
+.cc-icon .wxi{width:46px;height:46px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));}
+.cc-main{font-size:26px;font-weight:700;letter-spacing:-.5px;color:var(--text-primary);line-height:1.05;}
+.cc-box.cc-temp .cc-main{font-size:42px;letter-spacing:-1.5px;}
+.cc-sub{font-size:13px;color:var(--text-muted);line-height:1.45;}
+.cc-syn{font-size:12px;color:var(--text-dim);font-style:italic;margin-top:3px;max-width:170px;line-height:1.35;}
+.curr-divider{width:1px;align-self:stretch;background:linear-gradient(180deg,transparent,var(--border2) 20%,var(--border2) 80%,transparent);flex-shrink:0;}
+.cur-date{font-size:15px;font-weight:600;color:var(--text-primary);margin-right:14px;white-space:nowrap;}
 
 /* ── Toolbar ── */
 .toolbar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:var(--surface);}
@@ -169,7 +166,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .sec-head-wind td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#d9f99d;text-align:left!important;padding-left:20px!important;}
 .sec-head-rain td.row-label{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#90caf9;text-align:left!important;padding-left:20px!important;}
 .sec-head-temp .hilocell,.sec-head-rain .hilocell,.sec-head-wind .hilocell{font-size:12px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
-.icon-row td{text-align:center;padding:6px 3px;font-size:17px;background:transparent!important;border:none!important;}
+.icon-row td:not(.row-label){text-align:center;padding:6px 3px;font-size:17px;background:transparent!important;border:none!important;}
 .wxi{display:inline-block;vertical-align:-0.18em;width:1.3em;height:1.3em;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));}
 .icon-row .wxi{width:26px;height:26px;}
 .curr-icon .wxi{width:48px;height:48px;}
@@ -251,33 +248,11 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 <div class="model-panel" id="model-panel"></div>
 
-<!-- Current conditions bar -->
-<div id="curr-bar">
-  <div class="curr-icon" id="curr-icon">–</div>
-  <div class="curr-temp-block">
-    <div class="curr-temp" id="curr-temp">–°</div>
-    <div class="curr-hilo" id="curr-hilo">–</div>
-  </div>
-  <div class="curr-meta">
-    <div class="curr-line" id="curr-date" style="color:var(--text-primary);font-weight:600">–</div>
-    <div class="curr-line" id="curr-feels">–</div>
-    <div class="curr-synopsis" id="curr-synopsis"></div>
-  </div>
-  <div class="curr-divider"></div>
-  <div class="curr-block">
-    <div class="curr-lbl">Rain today</div>
-    <div class="curr-val" id="curr-today-total" style="font-size:20px;color:#90caf9">–</div>
-  </div>
-
-  <div class="curr-divider"></div>
-  <div class="curr-block">
-    <div class="curr-lbl">Wind</div>
-    <div class="curr-val" id="curr-wind">–</div>
-    <div class="curr-sub" id="curr-winddir">–</div>
-  </div>
-</div>
+<!-- Current conditions bar (built by renderCurrentBar) -->
+<div id="curr-bar"></div>
 
 <div class="toolbar">
+  <div class="cur-date" id="curr-date">–</div>
   <!-- Timeframe -->
   <div class="btn-group" id="view-btns">
     <button class="btn active" onclick="setView('1h',this)">1hr</button>
@@ -285,7 +260,6 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
     <button class="btn" onclick="setView('8h',this)">8hr</button>
     <button class="btn" onclick="setView('daily',this)">Daily</button>
   </div>
-
 </div>
 
 <!-- City prompt modal -->
@@ -962,44 +936,113 @@ function computeCurrentFromHourly(){
     }
   });
 
-  return {temp,wind,windDir,wcode,hi,lo,rainToday};
+  // Current cloud + today's expected wind & cloud ranges (blended)
+  const cloud=wAt('cloudcover',nowIdx);
+  let windHi=null,windLo=null,cloudHi=null,cloudLo=null;
+  ref.time.forEach((t,i)=>{
+    if(t.slice(0,10)!==todayStr)return;
+    const wv=wAt('windspeed_10m',i);
+    if(wv!=null){windHi=windHi==null?wv:Math.max(windHi,wv);windLo=windLo==null?wv:Math.min(windLo,wv);}
+    const cv=wAt('cloudcover',i);
+    if(cv!=null){cloudHi=cloudHi==null?cv:Math.max(cloudHi,cv);cloudLo=cloudLo==null?cv:Math.min(cloudLo,cv);}
+  });
+
+  // Actual rain observed today so far (BOM), midnight → now
+  let actualRainToday=null;
+  if(actualData?.hourly?.time){
+    actualRainToday=0;
+    actualData.hourly.time.forEach((t,i)=>{
+      if(t.slice(0,10)===todayStr && new Date(t)<=now){
+        const v=actualData.hourly.precipitation?.[i];if(v!=null)actualRainToday+=v;
+      }
+    });
+  }
+
+  return {temp,wind,windDir,wcode,hi,lo,rainToday,cloud,windHi,windLo,cloudHi,cloudLo,actualRainToday};
 }
 
 function renderCurrentBar(){
-  // Prefer computed values from models' hourly data (avg/weighted per toggle)
   const comp=computeCurrentFromHourly();
-  // Fall back to the API current snapshot for feels-like / icon if needed
   const c=cachedCurrent?.c;
   if(!comp&&!c)return;
 
   const temp   = comp?.temp ?? c?.temperature_2m;
+  const feels  = c?.apparent_temperature;
   const wind   = comp?.wind ?? c?.windspeed_10m;
   const windDir= comp?.windDir ?? c?.winddirection_10m;
   const wcode  = comp?.wcode ?? c?.weathercode;
-  const todayHi= comp?.hi ?? cachedHiLo?.hi;
-  const todayLo= comp?.lo ?? cachedHiLo?.lo;
+  const hi     = comp?.hi ?? cachedHiLo?.hi;
+  const lo     = comp?.lo ?? cachedHiLo?.lo;
   const rainToday = comp?.rainToday ?? 0;
-
-  const windArrow=dirArrow16(windDir??0);
-
+  const actualRain = comp?.actualRainToday;
+  const cloud  = comp?.cloud;
+  const windHi = comp?.windHi, windLo = comp?.windLo;
+  const cloudHi= comp?.cloudHi, cloudLo= comp?.cloudLo;
   const currNight = c ? (c.is_day===0) : isNightAt(new Date().toISOString());
-  document.getElementById('curr-icon').innerHTML=wxIcon(wcode,currNight);
-  document.getElementById('curr-temp').textContent=temp!=null?`${tempDisp(temp)}°`:'—';
-  document.getElementById('curr-hilo').textContent=
-    todayHi!=null?`↑${tempDisp(todayHi)}° ↓${todayLo!=null?tempDisp(todayLo)+'°':'—'}`:'—';
-  document.getElementById('curr-date').textContent=new Date().toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
-  // Feels-like still comes from API current (not in hourly models)
-  document.getElementById('curr-feels').textContent=c?`Feels ${tempDisp(c.apparent_temperature)}°`:'';
-  document.getElementById('curr-synopsis').textContent=c?briefSynopsis(c):'';
 
-  const todayTotEl=document.getElementById('curr-today-total');
-  if(todayTotEl) todayTotEl.textContent=rainToday.toFixed(1)+' mm';
+  const T=(v,suf='°')=>v!=null?tempDisp(v)+suf:'—';
+  const arrow=dirArrow16(windDir??0), dir=dirFull(windDir??0);
 
-  if(wind!=null){
-    document.getElementById('curr-wind').textContent=`${Math.round(wind)} km/h · ${windWord(wind)}`;
-    document.getElementById('curr-winddir').textContent=`${windArrow} ${dirFull(windDir??0)}`;
-  }
-  document.getElementById('curr-bar').classList.add('loaded');
+  // ── Synopses ──
+  const condSyn = `${tempWord(temp)} · ${wxDesc(wcode, !currNight)}`;
+  const tempSyn = tempTrendSyn(temp,hi,lo);
+  const rainSyn = rainSynopsis(rainToday, actualRain);
+  const windSyn = `${windWord(wind??0)}${wind!=null&&wind>=10?' from the '+dir:''}`;
+  const cloudSyn= cloudSynopsis(cloud);
+
+  const box=(cls,title,color,body,syn)=>
+    `<div class="cc-box ${cls}"><div class="cc-title" style="color:${color}">${title}</div>${body}<div class="cc-syn">${syn}</div></div>`;
+  const div=`<div class="curr-divider"></div>`;
+
+  const condBox = `<div class="cc-box"><div class="cc-title" style="color:var(--text-muted)">Conditions</div><div class="cc-icon">${wxIcon(wcode,currNight)}</div><div class="cc-syn">${condSyn}</div></div>`;
+
+  const tempBox = box('cc-temp','Temp','#86efac',
+    `<div class="cc-main">${T(temp)}</div>`+
+    `<div class="cc-sub">Feels ${T(feels)}</div>`+
+    `<div class="cc-sub">↑ ${T(hi)}　↓ ${T(lo)}</div>`, tempSyn);
+
+  const rainBox = box('','Rain','#90caf9',
+    `<div class="cc-main">${rainToday.toFixed(1)} mm</div>`+
+    `<div class="cc-sub">Actual ${actualRain!=null?actualRain.toFixed(1)+' mm':'—'}</div>`+
+    `<div class="cc-sub">Expected ${rainToday.toFixed(1)} mm</div>`, rainSyn);
+
+  const windBox = box('','Wind','#d9f99d',
+    `<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}</div>`+
+    `<div class="cc-sub">${arrow} ${dir}</div>`+
+    `<div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`, windSyn);
+
+  const cloudBox = box('','Cloud','#c4b5fd',
+    `<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}</div>`+
+    `<div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div>`, cloudSyn);
+
+  const bar=document.getElementById('curr-bar');
+  bar.innerHTML=condBox+div+tempBox+div+rainBox+div+windBox+div+cloudBox;
+  bar.classList.add('loaded');
+
+  const dateEl=document.getElementById('curr-date');
+  if(dateEl)dateEl.textContent=new Date().toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
+}
+
+function tempWord(t){if(t==null)return'';return t<0?'Freezing':t<8?'Cold':t<16?'Cool':t<24?'Mild':t<30?'Warm':'Hot';}
+function tempTrendSyn(temp,hi,lo){
+  if(temp==null||hi==null)return tempWord(temp);
+  if(temp>=hi-1)return`Near today's peak of ${Math.round(hi)}°`;
+  return `${tempWord(temp)} now, rising to ${Math.round(hi)}°`;
+}
+function rainSynopsis(expected,actual){
+  if(expected<0.2)return'Dry day expected';
+  if(expected<2)return'Slight chance of rain';
+  if(expected<8)return'Light rain likely';
+  if(expected<20)return'Showers expected';
+  return'Heavy rain expected';
+}
+function cloudSynopsis(c){
+  if(c==null)return'';
+  if(c<12)return'Clear skies';
+  if(c<40)return'Mostly clear';
+  if(c<70)return'Partly cloudy';
+  if(c<90)return'Cloudy';
+  return'Overcast';
 }
 
 // Returns 16-point compass arrow
@@ -1499,7 +1542,7 @@ function buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,r
     const cls=cloudCls(v);const nc=ci===nowCi?"now-col":"";
     return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${Math.round(v)}%</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());
   }).join(""):null;
-  return`<tr class="sec-head-temp">${secHeadLabel('cloud','<span style="color:#c4b5fd">☁️ Cloud</span>')}${avgCells}</tr>${srcRows}`+
+  return`<tr class="sec-head-temp">${secHeadLabel('cloud','<span style="color:#c4b5fd">Cloud</span>')}${avgCells}</tr>${srcRows}`+
     (actCells?`<tr class="actual-row"><td class="row-label" style="color:#c4b5fd">✓ Actual</td>${actCells}</tr>`:"");
 }
 function tempCls(v){if(v==null)return'';if(v<5)return'tc';if(v<12)return'tk';if(v<22)return'tm';if(v<30)return'tw';return'th';}
@@ -2046,19 +2089,19 @@ function renderHourly(){
       <tr class="spacer"><td colspan="${C}"></td></tr>
     </tbody>
     ${secGroup('temp',`
-      <tr class="sec-head-temp">${secHeadLabel('temp','🌡 Temp')}${avgTempCells}</tr>
+      <tr class="sec-head-temp">${secHeadLabel('temp','Temp')}${avgTempCells}</tr>
       ${tempModelRows}
       ${actualData&&showActuals?`<tr class="actual-row"><td class="row-label" style="color:#86efac">✓ Actual</td>${actualTempCells}</tr>`:''}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('rain',`
-      <tr class="sec-head-rain">${secHeadLabel('rain','🌧 Rain')}${avgRainCells}</tr>
+      <tr class="sec-head-rain">${secHeadLabel('rain','Rain')}${avgRainCells}</tr>
       ${rainModelRows}
       ${actualData&&showActuals?`<tr class="actual-row"><td class="row-label" style="color:#90caf9">✓ Actual</td>${actualRainCells}</tr>`:''}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('wind',`
-      <tr class="sec-head-wind">${secHeadLabel('wind','💨 Wind')}${avgWindCells}</tr>
+      <tr class="sec-head-wind">${secHeadLabel('wind','Wind')}${avgWindCells}</tr>
       <tr class="data-row src-row src-wind${secDetail.wind?'':' src-hidden'}"><td class="row-label" style="font-size:13px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
       ${windModelRows}
       <tr class="spacer"><td colspan="${C}"></td></tr>
@@ -2181,24 +2224,24 @@ function renderDaily(){
       <tr class="spacer"><td colspan="${C}"></td></tr>
     </tbody>
     ${secGroup('temp',`
-      <tr class="sec-head-temp">${secHeadLabel('temp','🌡 Temp')}${avgTempCells}</tr>
+      <tr class="sec-head-temp">${secHeadLabel('temp','Temp')}${avgTempCells}</tr>
       ${tempModelRows}
       ${actualData&&showActuals?`<tr class="actual-row"><td class="row-label" style="color:#86efac">✓ Actual</td>${actualTempCells}</tr>`:''}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('rain',`
-      <tr class="sec-head-rain">${secHeadLabel('rain','🌧 Rain')}${avgRainCells}</tr>
+      <tr class="sec-head-rain">${secHeadLabel('rain','Rain')}${avgRainCells}</tr>
       ${rainModelRows}
       ${actualData&&showActuals?`<tr class="actual-row"><td class="row-label" style="color:#90caf9">✓ Actual</td>${actualRainCells}</tr>`:''}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('wind',`
-      <tr class="sec-head-wind">${secHeadLabel('wind','💨 Wind')}${avgWindCells}</tr>
+      <tr class="sec-head-wind">${secHeadLabel('wind','Wind')}${avgWindCells}</tr>
       ${windModelRows}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('cloud',`
-      <tr class="sec-head-temp">${secHeadLabel('cloud','<span style="color:#c4b5fd">☁️ Cloud</span>')}${avgCloudCells}</tr>
+      <tr class="sec-head-temp">${secHeadLabel('cloud','<span style="color:#c4b5fd">Cloud</span>')}${avgCloudCells}</tr>
       ${cloudModelRows}
     `)}`;
 
