@@ -126,7 +126,8 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
 .day-col{background:var(--day-bg)!important;}
-.day-start{border-left:2px solid var(--day-line)!important;}
+.day-start{}
+.day-sep{position:absolute;top:0;width:0;border-left:1px solid #6b7280;pointer-events:none;z-index:9;}
 /* ── Consistent metric color scheme ── */
 /* Temperature: cool blue → warm red, bg tint + text */
 .tc{background:rgba(56,135,255,0.16)!important;color:#7eb3ff!important;}
@@ -176,7 +177,6 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .hilocell{font-size:12px;color:var(--text-muted);display:block;margin-top:1px;font-weight:400;}
 .src-row.src-hidden{display:none;}
 .sec-toggle{cursor:pointer;user-select:none;}
-.sec-caret{display:inline-block;width:0.9em;font-size:11px;color:var(--text-muted);}
 .section-group.sec-off{display:none;}
 .spacer td{height:18px;}
 .empty{color:var(--text-dim)!important;font-size:13px;}
@@ -532,7 +532,6 @@ function toggleDetail(){
   document.querySelectorAll('.src-row').forEach(r=>{
     if(!r.classList.contains('perm-hidden'))r.classList.toggle('src-hidden',!showDetail);
   });
-  document.querySelectorAll('.sec-caret').forEach(c=>c.textContent=showDetail?'▾':'▸');
   positionNowOverlay();
 }
 function updateDetailBtn(){
@@ -881,7 +880,7 @@ function buildForecastRainCache(){
 // ══════════════════════════════════════════
 function buildHiLoCache(){
   const onlyEnabled=activeEnabled();if(!onlyEnabled.length)return;
-  const todayStr=new Date().toISOString().slice(0,10);
+  const _n=new Date();const todayStr=`${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,"0")}-${String(_n.getDate()).padStart(2,"0")}`;
   const hiVals=onlyEnabled.map(m=>{
     const d=state.data[m.key]?.daily;if(!d)return null;
     const di=d.time.findIndex(t=>t===todayStr);if(di<0)return null;
@@ -1564,15 +1563,13 @@ function srcRowClass(m,sec){
 }
 // Clickable section header label that toggles that section's source rows
 function secHeadLabel(sec,content){
-  const open=secDetail[sec];
-  return`<td class="row-label sec-toggle" onclick="toggleSecDetail('${sec}')"><span class="sec-caret" data-sec="${sec}">${open?'▾':'▸'}</span> ${content}</td>`;
+  return`<td class="row-label sec-toggle" onclick="toggleSecDetail('${sec}')">${content}</td>`;
 }
 function toggleSecDetail(sec){
   secDetail[sec]=!secDetail[sec];
   document.querySelectorAll('.src-'+sec).forEach(r=>{
     if(!r.classList.contains('perm-hidden'))r.classList.toggle('src-hidden',!secDetail[sec]);
   });
-  document.querySelectorAll('.sec-caret[data-sec="'+sec+'"]').forEach(c=>c.textContent=secDetail[sec]?'▾':'▸');
   savePrefs();
   positionNowOverlay();
 }
@@ -1743,7 +1740,7 @@ function renderVerticalDaily(){
   const firstKey=onlyEnabled[0]?.key||allActive[0].key;
   const ref=state.data[firstKey].daily;
   const now=new Date();
-  const todayStr=now.toISOString().slice(0,10);
+  const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
   let si=ref.time.findIndex(t=>t>=todayStr);if(si<0)si=0;
   const pastSi=Math.max(0,si-7);
   const indices=Array.from({length:Math.min(17,ref.time.length-pastSi)},(_,i)=>pastSi+i);
@@ -1839,9 +1836,15 @@ function positionNowOverlay(){
     const hdrTh=wrap.querySelector('.hour-header th');
     const hdrH=hdrTh?hdrTh.offsetTop+hdrTh.offsetHeight:0;
 
+    // Clear any previously-drawn day-separator lines
+    wrap.querySelectorAll('.day-sep').forEach(e=>e.remove());
+
     if(!verticalLayout){
       // ── HORIZONTAL VIEW ──
-      const fullH=wrap.scrollHeight; // span the entire table, not just the viewport
+      // Measure the TABLE height (not wrap.scrollHeight, which would include the
+      // absolutely-positioned overlays themselves and never shrink again).
+      const tbl=wrap.querySelector('.ftable');
+      const fullH=tbl?tbl.offsetHeight:wrap.scrollHeight;
       const nowTh=wrap.querySelector('.hour-header th.now-col');
       if(nowTh&&ovV){
         const leftEdge=nowTh.offsetLeft;
@@ -1860,6 +1863,15 @@ function positionNowOverlay(){
         if(ovV)ovV.style.display='none';
         if(pastV)pastV.style.display='none';
       }
+      // Grey day-separator lines at each day boundary
+      wrap.querySelectorAll('.hour-header th.day-start').forEach(th=>{
+        const ln=document.createElement('div');
+        ln.className='day-sep';
+        ln.style.left=th.offsetLeft+'px';
+        ln.style.top='0';
+        ln.style.height=fullH+'px';
+        wrap.appendChild(ln);
+      });
       if(ovH)ovH.style.display='none';
       if(pastH)pastH.style.display='none';
     } else {
@@ -2061,7 +2073,7 @@ function renderDaily(){
   const firstKey=onlyEnabled[0]?.key||allActive[0].key;
   const ref=state.data[firstKey].daily;
   const now=new Date();
-  const todayStr=now.toISOString().slice(0,10);
+  const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 
   // Include past 7 days + next 10 (daily data includes past_days=7 from model fetch)
   // Go back up to 7 days or start of data
