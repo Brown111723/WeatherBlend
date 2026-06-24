@@ -47,12 +47,13 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 /* ── Toolbar ── */
 .toolbar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:var(--surface);}
+.toolbar .btn-group{margin-left:auto;}
 .date-info{font-size:15px;color:var(--text-muted);flex:1;min-width:150px;}
 .date-info strong{color:var(--text-primary);}
-.btn-group{display:flex;gap:3px;}
-.btn{padding:7px 13px;border-radius:10px;font-size:15px;font-weight:500;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;}
-.btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
-.btn:hover:not(.active){border-color:var(--border2);color:var(--text-primary);}
+.btn-group{display:flex;gap:6px;}
+.btn{padding:7px 14px;border-radius:10px;font-size:15px;font-weight:600;border:1px solid var(--border2);background:transparent;color:var(--text-primary);cursor:pointer;transition:all .15s;white-space:nowrap;opacity:.4;}
+.btn.active{opacity:1;background:var(--surface2);border-color:var(--border2);color:var(--text-primary);}
+.btn:hover:not(.active){opacity:.75;}
 /* Section toggles — coloured when on */
 .sec-toggle{padding:6px 11px;border-radius:8px;font-size:14px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;}
 .sec-toggle.on{color:var(--text-primary);background:var(--surface2);border-color:var(--border2);}
@@ -123,7 +124,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .row-label{position:sticky;left:0;z-index:14;background:var(--bg);min-width:98px;max-width:98px;text-align:left!important;padding-left:20px!important;border-right:1px solid var(--border);}
 .hour-header th.row-label{background:var(--bg);z-index:16;}
 .hour-header th{padding:12px 6px 8px;font-size:14px;font-weight:500;color:var(--text-muted);text-align:center;background:var(--bg);position:sticky;top:0;z-index:8;min-width:64px;border-bottom:2px solid var(--border);}
-.hour-header th.now-col{color:var(--now);background:linear-gradient(180deg,rgba(248,113,113,0.14),transparent);}
+.hour-header th.now-col{color:var(--now);background-color:var(--bg);background-image:linear-gradient(180deg,rgba(248,113,113,0.16),rgba(248,113,113,0.05));}
 .hour-header th.now-col .col-day,.hour-header th.now-col .col-time{color:var(--now)!important;font-weight:700;}
 
 /* Day/night: DAY columns stand OUT with a slight warm tint; night stays dark base */
@@ -248,12 +249,9 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 <div class="model-panel" id="model-panel"></div>
 
-<!-- Current conditions bar (built by renderCurrentBar) -->
-<div id="curr-bar"></div>
-
 <div class="toolbar">
   <div class="cur-date" id="curr-date">–</div>
-  <!-- Timeframe -->
+  <!-- Timeframe (floats right) -->
   <div class="btn-group" id="view-btns">
     <button class="btn active" onclick="setView('1h',this)">1hr</button>
     <button class="btn" onclick="setView('3h',this)">3hr</button>
@@ -261,6 +259,9 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
     <button class="btn" onclick="setView('daily',this)">Daily</button>
   </div>
 </div>
+
+<!-- Current conditions bar (built by renderCurrentBar) -->
+<div id="curr-bar"></div>
 
 <!-- City prompt modal -->
 <div class="city-overlay hidden" id="city-overlay">
@@ -1577,6 +1578,36 @@ function wxIcon(c,night){
 }
 // Is a given ISO hour night-time at this location?
 function isNightAt(iso){ return !isDay(new Date(iso).getTime(), iso.slice(0,10)); }
+// Derive a condition code from the BLENDED cloud% + precip so the icon matches
+// the cloud/rain rows. The model's own weathercode is only used to keep the
+// precip TYPE (snow/storm/fog) when it's actually precipitating.
+function deriveCondCode(precip,cloud,rawCode){
+  if(precip!=null&&precip>=0.15){
+    if(rawCode>=71&&rawCode<=77)return 73;   // snow
+    if(rawCode===85||rawCode===86)return 85; // snow showers
+    if(rawCode>=95)return 95;                // thunderstorm
+    if(precip>=2.5)return 65;                // heavy rain
+    return 61;                               // rain / showers
+  }
+  if(rawCode===45||rawCode===48)return 45;   // fog
+  if(cloud==null)return rawCode;             // no cloud data → fall back
+  if(cloud<=15)return 0;                     // clear
+  if(cloud<=45)return 1;                     // mainly clear
+  if(cloud<=75)return 2;                     // partly cloudy
+  return 3;                                  // overcast
+}
+// Daily variant: precip here is a whole-day SUM, so use day-scale thresholds.
+function deriveDailyCode(rainSum,cloud,rawCode){
+  if(rainSum!=null&&rainSum>=1){
+    if(rawCode>=71&&rawCode<=77)return 73;
+    if(rawCode>=95)return 95;
+    if(rainSum>=10)return 65;
+    return 61;
+  }
+  if(rawCode===45||rawCode===48)return 45;
+  if(cloud==null)return rawCode;
+  if(cloud<=15)return 0; if(cloud<=45)return 1; if(cloud<=75)return 2; return 3;
+}
 function dirArrow(deg){const a=['↑','↗','→','↘','↓','↙','←','↖'],d=['N','NE','E','SE','S','SW','W','NW'];const i=Math.round(((deg%360)+360)%360/45)%8;return`${a[i]} ${d[i]}`;}
 function hVals(key,field,indices){
   const d=state.data[key];if(!d)return indices.map(()=>null);
@@ -2057,7 +2088,19 @@ function renderHourly(){
   }).join('');
 
   const iconKey=onlyEnabled[0]?.key||allActive[0]?.key;
-  const iconCells=hVals(iconKey,'weathercode',indices).map((c,ci)=>{const nc=ci===nowCi?'now-col':'';const t=ref.time[indices[ci]];return injectColCls(`<td class="${[pastCls[ci]||'',nc].filter(Boolean).join(' ')}">${wxIcon(c,isNightAt(t))}</td>`,ndCls[ci]);}).join('');
+  // Blend cloud & precip per column once, then derive the icon from them so the
+  // Cond row agrees with the Cloud/Rain rows.
+  const _cloudArrs=onlyEnabled.map(m=>({key:m.key,arr:hVals(m.key,'cloudcover',indices)}));
+  const _rainArrs=onlyEnabled.map(m=>({key:m.key,arr:hVals(m.key,'precipitation',indices)}));
+  const _rawCodes=hVals(iconKey,'weathercode',indices);
+  const iconCells=indices.map((_,ci)=>{
+    const cloud=weightedAvgOf(_cloudArrs.map(o=>({key:o.key,val:o.arr[ci]})));
+    const rain=weightedAvgOf(_rainArrs.map(o=>({key:o.key,val:o.arr[ci]})));
+    const code=deriveCondCode(rain,cloud,_rawCodes[ci]);
+    const nc=ci===nowCi?'now-col':'';
+    const t=ref.time[indices[ci]];
+    return injectColCls(`<td class="${[pastCls[ci]||'',nc].filter(Boolean).join(' ')}">${wxIcon(code,isNightAt(t))}</td>`,ndCls[ci]);
+  }).join('');
 
   // ── Actual (ERA5) data rows ──
   function buildActualCells(field, indices, fmtFn, clsFn, nowCiRef){
@@ -2139,7 +2182,12 @@ function renderDaily(){
 
   function dVals(key,field){const d=state.data[key]?.daily;if(!d)return indices.map(()=>null);return indices.map(i=>d[field]?.[i]??null);}
 
-  const iconCells=dVals(firstKey,'weathercode').map(c=>`<td>${wxIcon(c)}</td>`).join('');
+  const _dRaw=dVals(firstKey,'weathercode');
+  const iconCells=indices.map((_,ci)=>{
+    const cloud=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dCloud(m.key,ci)})));
+    const rainSum=weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:dVals(m.key,'precipitation_sum')[ci]})));
+    return `<td>${wxIcon(deriveDailyCode(rainSum,cloud,_dRaw[ci]))}</td>`;
+  }).join('');
   const C=indices.length+1;
   const blanks=Array(indices.length).fill('<td></td>').join('');
 
