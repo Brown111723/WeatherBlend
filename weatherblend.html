@@ -847,12 +847,13 @@ async function fetchAllModels(){
     try{
       const url=`https://api.open-meteo.com${m.ep}`
         +`?latitude=${state.lat}&longitude=${state.lon}`
-        +`&hourly=precipitation,windspeed_10m,winddirection_10m,temperature_2m,weathercode,cloudcover`
-        +`&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,`
-        +`windspeed_10m_max,winddirection_10m_dominant,sunrise,sunset`
+        +`&hourly=precipitation,wind_speed_10m,wind_direction_10m,temperature_2m,weather_code,cloud_cover`
+        +`&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,`
+        +`wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset`
         +`&models=${m.key}&past_days=7&forecast_days=10&timezone=auto&wind_speed_unit=kmh`;
-      const res=await fetch(url);if(!res.ok)throw new Error(`HTTP ${res.status}`);
+      const res=await fetch(url,{signal:AbortSignal.timeout(20000)});if(!res.ok)throw new Error(`HTTP ${res.status}`);
       const json=await res.json();if(json.error)throw new Error(json.reason||'API error');
+      normalizeOM(json);
       if(!json.hourly?.temperature_2m?.some(v=>v!=null))throw new Error('No data');
       state.data[m.key]=json;state.status[m.key]='ok';
       if(locationOffsetSec==null&&typeof json.utc_offset_seconds==='number')locationOffsetSec=json.utc_offset_seconds;
@@ -954,13 +955,18 @@ async function fetchCurrentConditions(){
   try{
     const url=`https://api.open-meteo.com/v1/forecast`
       +`?latitude=${state.lat}&longitude=${state.lon}`
-      +`&current=temperature_2m,apparent_temperature,precipitation,weathercode,`
-      +`windspeed_10m,winddirection_10m,is_day,relative_humidity_2m`
+      +`&current=temperature_2m,apparent_temperature,precipitation,weather_code,`
+      +`wind_speed_10m,wind_direction_10m,is_day,relative_humidity_2m`
       +`&hourly=precipitation&past_hours=24&forecast_hours=1`
       +`&daily=temperature_2m_max,temperature_2m_min`
       +`&forecast_days=1&timezone=auto&wind_speed_unit=kmh`;
-    const res=await fetch(url);if(!res.ok)return;
+    const res=await fetch(url,{signal:AbortSignal.timeout(15000)});if(!res.ok)return;
     const d=await res.json();if(d.error)return;
+    if(d.current){const c=d.current;
+      if(c.weathercode==null&&c.weather_code!=null)c.weathercode=c.weather_code;
+      if(c.windspeed_10m==null&&c.wind_speed_10m!=null)c.windspeed_10m=c.wind_speed_10m;
+      if(c.winddirection_10m==null&&c.wind_direction_10m!=null)c.winddirection_10m=c.wind_direction_10m;
+    }
     cachedCurrent={c:d.current,precipHourly:d.hourly?.precipitation||[],daily:d.daily};
     renderCurrentBar();
   }catch(e){console.warn('Current:',e.message);}
@@ -1839,6 +1845,24 @@ function applyHistoricalWeights(){
 // Reference hourly grid (first enabled model)
 function refHourly(){const a=activeEnabled();return a.length?state.data[a[0].key]?.hourly:null;}
 
+// Open-Meteo migrated to underscored field names (cloud_cover, wind_speed_10m,
+// weather_code, …). Map the current names back to the legacy keys the rest of
+// the code reads, so a single fetch update keeps everything working.
+function normalizeOM(j){
+  const map=(o,oldK,newK)=>{ if(o && o[oldK]==null && o[newK]!=null) o[oldK]=o[newK]; };
+  if(j && j.hourly){
+    map(j.hourly,'cloudcover','cloud_cover');
+    map(j.hourly,'windspeed_10m','wind_speed_10m');
+    map(j.hourly,'winddirection_10m','wind_direction_10m');
+    map(j.hourly,'weathercode','weather_code');
+  }
+  if(j && j.daily){
+    map(j.daily,'windspeed_10m_max','wind_speed_10m_max');
+    map(j.daily,'winddirection_10m_dominant','wind_direction_10m_dominant');
+    map(j.daily,'weathercode','weather_code');
+  }
+}
+
 // Equal-weight blend at a ref index (used for the Open-Meteo fallback actuals)
 function meanAt(field,idx){
   const a=activeEnabled();
@@ -2169,6 +2193,7 @@ function secGroup(sec,html){
 // ══════════════════════════════════════════
 function setView(v,el){
   state.view=v;
+  savePrefs();
   document.querySelectorAll('#view-btns .btn').forEach(b=>b.classList.toggle('active',(b.getAttribute('onclick')||'').includes("'"+v+"'")));
   renderCurrentBar();  // instant update of rain labels/values
   if(Object.keys(state.data).length)renderTable(); // instant table re-render
