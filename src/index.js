@@ -395,7 +395,7 @@ const OM_MODELS = [
 
 async function fetchOpenMeteoModel(lat, lon, model, ep) {
   const u = `https://api.open-meteo.com${ep}?latitude=${lat}&longitude=${lon}` +
-            `&hourly=precipitation,windspeed_10m,temperature_2m,cloudcover` +
+            `&hourly=precipitation,wind_speed_10m,temperature_2m,cloud_cover` +
             `&models=${model}&past_days=2&forecast_days=8&timezone=auto&wind_speed_unit=kmh`;
   try {
     const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
@@ -414,9 +414,9 @@ function omModelDay(hourly, dateStr) {
     if (tv != null) { tmax = tmax == null ? tv : Math.max(tmax, tv); tmin = tmin == null ? tv : Math.min(tmin, tv); hasT = true; }
     const pv = hourly.precipitation ? hourly.precipitation[i] : null;
     if (pv != null) { rain += pv; hasR = true; }
-    const wv = hourly.windspeed_10m ? hourly.windspeed_10m[i] : null;
+    const wv = hourly.wind_speed_10m ? hourly.wind_speed_10m[i] : null;
     if (wv != null) wind = wind == null ? wv : Math.max(wind, wv);
-    const cv = hourly.cloudcover ? hourly.cloudcover[i] : null;
+    const cv = hourly.cloud_cover ? hourly.cloud_cover[i] : null;
     if (cv != null) { cs += cv; cn++; }
   }
   if (!hasT && !hasR) return null;
