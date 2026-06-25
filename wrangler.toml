@@ -6,6 +6,26 @@ name = "weatherblend-bom"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
 
+# ── Accuracy tracker storage (Cloudflare D1) ───────────────────────────────
+# 1) Create the database (one time):
+#       npx wrangler d1 create weatherblend-accuracy
+#    Copy the printed database_id into the binding below.
+# 2) Create the tables (one time):
+#       npx wrangler d1 execute weatherblend-accuracy --remote --file=schema.sql
+# 3) Deploy:
+#       npx wrangler deploy
+[[d1_databases]]
+binding = "DB"                          # the Worker reads env.DB
+database_name = "weatherblend-accuracy"
+database_id = "PASTE_DATABASE_ID_HERE"  # from `wrangler d1 create`
+
+# ── Daily capture cron ─────────────────────────────────────────────────────
+# Runs once a day (20:10 UTC ≈ early morning AEST) to snapshot forecasts and
+# pull BOM actuals for every station used in the last 30 days — gap-free,
+# whether or not anyone opened the app. Adjust the time to suit.
+[triggers]
+crons = ["10 20 * * *"]
+
 # After deploying, your Worker URL will look like:
 #   https://weatherblend-bom.<your-subdomain>.workers.dev
 # Paste that URL into BOM_WORKER_URL near the top of the <script> in weatherblend.html.
