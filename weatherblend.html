@@ -39,7 +39,11 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .cc-box{background:rgba(255,255,255,0.022);border:1px solid var(--border);border-radius:12px;padding:11px 13px;display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden;}
 .cc-box.cc-cond{grid-column:1 / -1;}
 .cc-box.cc-cond .cc-icon{margin:4px 0 2px;}
-.cc-cond-row{display:flex;align-items:center;gap:12px;}
+.cc-cond-row{display:flex;align-items:center;gap:14px;}
+.cc-lines{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;}
+.cc-line{font-size:13px;line-height:1.35;color:var(--text-muted);}
+.cc-line-k{font-weight:700;}
+.cc-line-v{color:var(--text-muted);}
 .cc-cond-row .cc-icon{margin:0;flex-shrink:0;}
 .cc-cond-row .cc-syn{margin-top:0;}
 .cc-title{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:2px;}
@@ -71,10 +75,8 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 
 /* ── Toolbar ── */
 /* Hourly carousel strip */
-#hour-strip-head{display:flex;align-items:center;justify-content:space-between;padding:8px 16px 4px;}
-.hs-title{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
-.hs-view{font-size:12px;font-weight:600;padding:3px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-primary);cursor:pointer;}
-#hour-bar{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding:4px 16px 14px;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.tf-select{font-size:12px;font-weight:600;padding:4px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-primary);cursor:pointer;}
+#hour-bar{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding:10px 16px 14px;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
 #hour-bar::-webkit-scrollbar{display:none;}
 .hb-tile{flex:0 0 auto;width:74px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 6px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.025);}
 .hb-tile.hb-past{opacity:.72;}
@@ -339,6 +341,12 @@ body{padding-bottom:64px;}
   <button class="today-btn dim" id="today-btn" onclick="goToToday()" title="Jump to today" aria-label="Jump to today">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6"/><line x1="16" y1="2.5" x2="16" y2="6"/><circle cx="12" cy="15.5" r="2.1" fill="currentColor" stroke="none"/></svg>
   </button>
+  <select class="tf-select" id="hs-view" onchange="setView(this.value)" title="Timeframe">
+    <option value="1h">Hourly</option>
+    <option value="3h">3-hourly</option>
+    <option value="8h">8-hourly</option>
+    <option value="daily">Daily</option>
+  </select>
   <div class="loc-wrap">
     <button class="loc-btn" onclick="promptLocation()">📍 <span class="loc-name" id="loc-name">Detecting…</span></button>
     <div class="loc-detail" id="loc-detail"></div>
@@ -348,15 +356,6 @@ body{padding-bottom:64px;}
 <!-- Carousels section (day overview + hourly strip) -->
 <div id="carousels-section">
   <div id="curr-bar"></div>
-  <div id="hour-strip-head">
-    <span class="hs-title">Hourly</span>
-    <select class="hs-view" id="hs-view" onchange="setView(this.value)">
-      <option value="1h">Hourly</option>
-      <option value="3h">3-hourly</option>
-      <option value="8h">8-hourly</option>
-      <option value="daily">Daily</option>
-    </select>
-  </div>
   <div id="hour-bar"></div>
 </div>
 
@@ -885,7 +884,7 @@ function cityTypeahead(v){
   _typeTmr=setTimeout(async()=>{
     const myId=++_lastTypeId;
     try{
-      const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=10&language=en&format=json`,{signal:AbortSignal.timeout(8000)});
+      const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=25&language=en&format=json`,{signal:AbortSignal.timeout(8000)});
       const d=await r.json();
       if(myId!==_lastTypeId)return; // a newer keystroke superseded this
       renderCityResults(d.results||[], region);
@@ -925,7 +924,7 @@ async function geocodeCity(name){
   setStatus('spin',`Searching "${name}"…`);
   const {city,region}=splitCityQuery(name);
   try{
-    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city||name)}&count=10&language=en&format=json`);
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city||name)}&count=25&language=en&format=json`);
     const d=await r.json();
     if(!d.results||!d.results.length){showCityPrompt('City not found. Try typing just the town name:');return;}
     // Prefer a result whose admin1/country matches the region the user typed
@@ -1209,7 +1208,7 @@ function computeDaySummary(dateStr){
 }
 
 const _ccBox=(cls,title,color,body,syn)=>
-  `<div class="cc-box ${cls}"><div class="cc-title" style="color:${color}">${title}</div>${body}<div class="cc-syn">${syn}</div></div>`;
+  `<div class="cc-box ${cls}"><div class="cc-title" style="color:${color}">${title}</div>${body}</div>`;
 const _T=(v,suf='°')=>v!=null?tempDisp(v)+suf:'—';
 
 // Today page — live "current" values
@@ -1229,11 +1228,13 @@ function buildTodayBoxes(){
   const arrow=dirArrow16(windDir??0), dir=dirFull(windDir??0);
   const narrative=todayNarrative(temp,wcode,night,wind,dir,rainToday,hi,lo);
 
-  const cond=_condTile(wxIcon(wcode,night,phase),narrative);
-  const t=_ccBox('cc-temp','Temp','#86efac',`<div class="cc-main">${_T(temp)}</div><div class="cc-sub">Feels ${_T(feels)}</div><div class="cc-sub">↑ ${_T(hi)}　↓ ${_T(lo)}</div>`,tempTrendSyn(temp,hi,lo));
-  const r=_ccBox('','Rain','#90caf9',`<div class="cc-main">${rainToday.toFixed(1)} mm</div><div class="cc-sub">Actual ${actualRain!=null?actualRain.toFixed(1)+' mm':'—'}</div><div class="cc-sub">Expected ${rainToday.toFixed(1)} mm</div>`,rainSynopsis(rainToday,actualRain));
-  const w=_ccBox('','Wind','#d9f99d',`<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}</div><div class="cc-sub">${arrow} ${dir}</div><div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`,`${windWord(wind??0)}${wind!=null&&wind>=10?' from the '+dir:''}`);
-  const cl=_ccBox('','Cloud','#c4b5fd',`<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}</div><div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div>`,cloudSynopsis(cloud));
+  const windS=`${windWord(wind??0)}${wind!=null&&wind>=10?' from the '+dir:(wind!=null?' winds':'')}`;
+  const cond=_condTile(wxIcon(wcode,night,phase),_condLines(
+    tempTrendSyn(temp,hi,lo), rainSynopsis(rainToday,actualRain), windS, cloudSynopsis(cloud)));
+  const t=_ccBox('cc-temp','Temp','#86efac',`<div class="cc-main">${_T(temp)}</div><div class="cc-sub">Feels ${_T(feels)}</div><div class="cc-sub">↑ ${_T(hi)}　↓ ${_T(lo)}</div>`);
+  const r=_ccBox('','Rain','#90caf9',`<div class="cc-main">${rainToday.toFixed(1)} mm</div><div class="cc-sub">Actual ${actualRain!=null?actualRain.toFixed(1)+' mm':'—'}</div><div class="cc-sub">Expected ${rainToday.toFixed(1)} mm</div>`);
+  const w=_ccBox('','Wind','#d9f99d',`<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}</div><div class="cc-sub">${arrow} ${dir}</div><div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`);
+  const cl=_ccBox('','Cloud','#c4b5fd',`<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}</div><div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div>`);
   return cond+t+r+w+cl;
 }
 
@@ -1245,7 +1246,9 @@ function buildDayBoxes(dateStr){
   const past=s.isPast;
   const arrow=s.windDir!=null?dirArrow16(s.windDir):'', dir=s.windDir!=null?dirFull(s.windDir):'';
   const HL=(hi,lo,u)=>`↑${hi!=null?Math.round(hi)+u:'—'}<span style="display:inline-block;width:10px"></span>↓${lo!=null?Math.round(lo)+u:'—'}`;
-  const cond=_condTile(wxIcon(s.dayCode,false),dayNarrative(s,dir));
+  const windS=`${windWord(s.windNoon??0)}${s.windNoon!=null&&s.windNoon>=10&&dir?' from the '+dir:(s.windNoon!=null?' winds':'')}`;
+  const cond=_condTile(wxIcon(s.dayCode,false),_condLines(
+    tempDaySynopsis(s.hi,s.lo), rainSynopsis(s.rain,s.actualRain), windS, cloudSynopsis(s.cloudMean)));
 
   // TEMP
   const tActual = past && s.aHasT;
@@ -1282,9 +1285,13 @@ function buildDayBoxes(dateStr){
   return cond+t+r+w+cl;
 }
 
-// Conditions tile: title on top, icon + synopsis side by side
-function _condTile(iconHtml,syn){
-  return `<div class="cc-box cc-cond"><div class="cc-title" style="color:var(--text-muted)">Conditions</div><div class="cc-cond-row"><div class="cc-icon">${iconHtml}</div><div class="cc-syn">${syn}</div></div></div>`;
+// Conditions tile: title, icon, and four colour-coded metric synopsis lines
+function _condTile(iconHtml,linesHtml){
+  return `<div class="cc-box cc-cond"><div class="cc-title" style="color:var(--text-muted)">Conditions</div><div class="cc-cond-row"><div class="cc-icon">${iconHtml}</div><div class="cc-lines">${linesHtml}</div></div></div>`;
+}
+function _condLines(tempS,rainS,windS,cloudS){
+  const row=(k,col,txt)=>`<div class="cc-line"><span class="cc-line-k" style="color:${col}">${k}:</span> <span class="cc-line-v">${txt||'—'}</span></div>`;
+  return row('Temp','#86efac',tempS)+row('Rain','#90caf9',rainS)+row('Wind','#d9f99d',windS)+row('Cloud','#c4b5fd',cloudS);
 }
 
 // Snapshot of one specific hour (used when the table is scrolled to that column)
@@ -1320,6 +1327,19 @@ function relDayLabel(dateStr,today){
 }
 
 function pageGridHTML(date){return date===localTodayStr()?buildTodayBoxes():buildDayBoxes(date);}
+
+function updateDateUI(){
+  const today=localTodayStr();
+  const dateEl=document.getElementById('curr-date');
+  if(dateEl&&selDate){
+    const d=new Date(selDate+'T12:00:00');
+    const dateStr=d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
+    dateEl.innerHTML=`<div class="cur-date-main">${dateStr}</div><div class="cur-date-rel">${relDayLabel(selDate,today)}</div>`;
+    dateEl.classList.toggle('not-today',selDate!==today);
+  }
+  const tb=document.getElementById('today-btn');
+  if(tb)tb.classList.toggle('dim',selDate===today);
+}
 
 function renderCurrentBar(){
   const bar=document.getElementById('curr-bar');
@@ -1468,9 +1488,8 @@ function buildHourTile(iso){
 }
 
 function renderHourBar(){
-  const bar=document.getElementById('hour-bar'), head=document.getElementById('hour-strip-head');
+  const bar=document.getElementById('hour-bar');
   const sel=document.getElementById('hs-view'); if(sel&&sel.value!==state.view)sel.value=state.view;
-  if(head)head.style.display='';            // keep the timeframe selector reachable
   if(!bar)return;
   if(state.view==='daily'){ bar.style.display='none'; bar.innerHTML=''; return; }
   bar.style.display='';
@@ -2812,7 +2831,7 @@ function renderHourly(){
 
   document.querySelector('.ftable').innerHTML=`
     <tbody>
-      <tr class="hour-header"><th class="row-label corner-cell">${viewDropdown()}</th>${hdrCells}</tr>
+      <tr class="hour-header"><th class="row-label corner-cell"></th>${hdrCells}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
       <tr class="icon-row"><td class="row-label" style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px">Cond.</td>${iconCells}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
@@ -2952,7 +2971,7 @@ function renderDaily(){
 
   document.querySelector('.ftable').innerHTML=`
     <tbody>
-      <tr class="hour-header"><th class="row-label corner-cell">${viewDropdown()}</th>${dayHdrs}</tr>
+      <tr class="hour-header"><th class="row-label corner-cell"></th>${dayHdrs}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
       <tr class="icon-row"><td class="row-label" style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px">Cond.</td>${iconCells}</tr>
       <tr class="spacer"><td colspan="${C}"></td></tr>
