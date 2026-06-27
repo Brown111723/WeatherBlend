@@ -404,13 +404,6 @@ body{padding-bottom:64px;}
       <span class="dh-title">Weather<span>Blend</span></span>
       <button class="drawer-close" onclick="closeDrawer()" aria-label="Close">×</button>
     </div>
-    <div class="drawer-label">Timeframe</div>
-    <div class="seg" id="tf-seg">
-      <button data-v="1h" onclick="setView('1h')">Hourly</button>
-      <button data-v="3h" onclick="setView('3h')">3-hr</button>
-      <button data-v="8h" onclick="setView('8h')">8-hr</button>
-      <button data-v="daily" onclick="setView('daily')">Daily</button>
-    </div>
     <div class="drawer-label">Options</div>
     <button class="drawer-item" onclick="closeDrawer();showAccuracy()">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="13"/><line x1="10" y1="20" x2="10" y2="7"/><line x1="16" y1="20" x2="16" y2="11"/><line x1="21" y1="20" x2="3" y2="20"/></svg>
@@ -912,7 +905,7 @@ function loadPrefs(){
     if(p.secVisible)Object.assign(secVisible,p.secVisible);
     if(p.secDetail)Object.assign(secDetail,p.secDetail);
     if(p.enabled){enabled.clear();p.enabled.forEach(k=>{if(MODELS.find(m=>m.key===k))enabled.add(k);});}
-    if(p.view)state.view=p.view;
+    state.view='1h';   // timeframes removed — always hourly
     if(p.sectionsVisible)Object.assign(sectionsVisible,p.sectionsVisible);
   }catch(e){}
 }
@@ -1218,37 +1211,24 @@ function computeCurrentFromHourly(){
   const windDir=wAt('winddirection_10m',nowIdx);
   const wcode=state.data[onlyEnabled[0].key]?.hourly?.weathercode?.[nowIdx]??null;
 
-  // Today's hi/lo = weighted-avg of each model's DAILY max/min for today
-  const hi=weightedAvgOf(onlyEnabled.map(m=>{
-    const d=state.data[m.key]?.daily; if(!d)return{key:m.key,val:null};
-    const di=d.time?.findIndex(t=>t===todayStr)??-1;
-    return{key:m.key,val:di>=0?(d.temperature_2m_max?.[di]??null):null};
-  }),'temp',0);
-  const lo=weightedAvgOf(onlyEnabled.map(m=>{
-    const d=state.data[m.key]?.daily; if(!d)return{key:m.key,val:null};
-    const di=d.time?.findIndex(t=>t===todayStr)??-1;
-    return{key:m.key,val:di>=0?(d.temperature_2m_min?.[di]??null):null};
-  }),'temp',0);
-
-  // Rain today = sum of the blended (AVG) hourly precip across ALL of today's
-  // hours (midnight to midnight) — i.e. adding up today's cells of the AVG row.
-  let rainToday=0;
-  ref.time.forEach((t,i)=>{
-    if(t.slice(0,10)===todayStr){
-      const v=wAt('precipitation',i);if(v!=null)rainToday+=v;
-    }
-  });
-
-  // Current cloud + today's expected wind & cloud ranges (blended)
+  // Current cloud
   const cloud=wAt('cloudcover',nowIdx);
-  let windHi=null,windLo=null,cloudHi=null,cloudLo=null;
+  // Day aggregates from the blended HOURLY series so they match the table exactly:
+  // hi/lo = max/min of hourly temp; rain = full-day total + rest-of-day; wind/cloud ranges.
+  let tHi=null,tLo=null,rainFcst=0,rainRemain=0,windHi=null,windLo=null,cloudHi=null,cloudLo=null;
   ref.time.forEach((t,i)=>{
     if(t.slice(0,10)!==todayStr)return;
+    const future=new Date(t)>now;
+    const tv=wAt('temperature_2m',i);
+    if(tv!=null){tHi=tHi==null?tv:Math.max(tHi,tv);tLo=tLo==null?tv:Math.min(tLo,tv);}
+    const pr=wAt('precipitation',i);
+    if(pr!=null){rainFcst+=pr; if(future)rainRemain+=pr;}
     const wv=wAt('windspeed_10m',i);
     if(wv!=null){windHi=windHi==null?wv:Math.max(windHi,wv);windLo=windLo==null?wv:Math.min(windLo,wv);}
     const cv=wAt('cloudcover',i);
     if(cv!=null){cloudHi=cloudHi==null?cv:Math.max(cloudHi,cv);cloudLo=cloudLo==null?cv:Math.min(cloudLo,cv);}
   });
+  const hi=tHi, lo=tLo;
 
   // Actual rain observed today so far (BOM), midnight → now
   let actualRainToday=null;
@@ -1260,6 +1240,11 @@ function computeCurrentFromHourly(){
       }
     });
   }
+
+  // Today's total = what's actually fallen + what's still forecast to come, so the
+  // card's Actual + Expected always sums to the headline (and matches the table:
+  // sum past-hour Actual cells + future-hour AVG cells).
+  const rainToday=(actualRainToday!=null)?(actualRainToday+rainRemain):rainFcst;
 
   // Prefer BOM's most-recent observation (~half-hourly) for the live "now"
   // figures — actual measurements beat the model blend for current conditions.
@@ -1273,7 +1258,7 @@ function computeCurrentFromHourly(){
     if(bl.cloud!=null){cCloud=bl.cloud;obsCloud=true;}
     if(bl.humid!=null)obsHumid=bl.humid;
   }
-  return {temp:cTemp,wind:cWind,windDir,wcode,hi,lo,rainToday,cloud:cCloud,windHi,windLo,cloudHi,cloudLo,actualRainToday,
+  return {temp:cTemp,wind:cWind,windDir,wcode,hi,lo,rainToday,rainRemainToday:rainRemain,cloud:cCloud,windHi,windLo,cloudHi,cloudLo,actualRainToday,
           obsTemp,obsWind,obsCloud,obsTime,obsHumid};
 }
 
@@ -1297,12 +1282,11 @@ function computeDaySummary(dateStr){
   const now=new Date();
   const hz=horizonOf(dateStr);
   const wAt=(f,i)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.[f]?.[i]??null})),fieldSec(f),hz);
-  const dHL=(field)=>weightedAvgOf(onlyEnabled.map(m=>{const d=state.data[m.key]?.daily;const i=d?.time?.findIndex(t=>t===dateStr)??-1;return{key:m.key,val:i>=0?(d[field]?.[i]??null):null};}),'temp',hz);
-  const hi=dHL('temperature_2m_max'), lo=dHL('temperature_2m_min');
 
-  let rain=0,windHi=null,windLo=null,cloudHi=null,cloudLo=null,cloudSum=0,cloudN=0,noonIdx=-1,noonDiff=99;
+  let hi=null,lo=null,rain=0,windHi=null,windLo=null,cloudHi=null,cloudLo=null,cloudSum=0,cloudN=0,noonIdx=-1,noonDiff=99;
   ref.time.forEach((t,i)=>{
     if(t.slice(0,10)!==dateStr)return;
+    const tv=wAt('temperature_2m',i);if(tv!=null){hi=hi==null?tv:Math.max(hi,tv);lo=lo==null?tv:Math.min(lo,tv);}
     const pr=wAt('precipitation',i);if(pr!=null)rain+=pr;
     const wv=wAt('windspeed_10m',i);if(wv!=null){windHi=windHi==null?wv:Math.max(windHi,wv);windLo=windLo==null?wv:Math.min(windLo,wv);}
     const cv=wAt('cloudcover',i);if(cv!=null){cloudHi=cloudHi==null?cv:Math.max(cloudHi,cv);cloudLo=cloudLo==null?cv:Math.min(cloudLo,cv);cloudSum+=cv;cloudN++;}
@@ -1352,11 +1336,11 @@ function buildTodayBoxes(){
   const narrative=todayNarrative(temp,wcode,night,wind,dir,rainToday,hi,lo);
 
   const cond=condCard({today:true, icon:wxIcon(wcode,night,phase), condWord:wxDesc(wcode,!night),
-    temp, feels, hi, lo, rain:rainToday, actualRain, wind, dir, cloud, code:wcode});
+    temp, feels, hi, lo, rain:rainToday, restOfDay:comp?.rainRemainToday, actualRain, wind, dir, cloud, code:wcode});
   const dot=on=>on?'<span class="obs-dot" title="BOM observation">●</span>':'';
   const t=_ccBox('cc-temp','Temp','#86efac',`<div class="cc-main">${_T(temp)}${dot(comp?.obsTemp)}</div><div class="cc-sub">Feels ${_T(feels)}</div><div class="cc-sub">↑ ${_T(hi)}　↓ ${_T(lo)}</div>`);
-  const rainRemain=Math.max(0,rainToday-(actualRain||0));
-  const r=_ccBox('','Rain','#90caf9',`<div class="cc-main">${rainToday.toFixed(1)} mm</div><div class="cc-sub">Actual ${actualRain!=null?actualRain.toFixed(1)+' mm':'—'}</div><div class="cc-sub">Expected ${rainRemain.toFixed(1)} mm</div>`);
+  const rainRemain=comp?.rainRemainToday??Math.max(0,rainToday-(actualRain||0));
+  const r=_ccBox('','Rain','#90caf9',`<div class="cc-main">${rainToday.toFixed(1)} mm</div><div class="cc-sub">Actual ${actualRain!=null?actualRain.toFixed(1)+' mm':'—'}</div><div class="cc-sub">Rest of day ${rainRemain.toFixed(1)} mm</div>`);
   const w=_ccBox('','Wind','#d9f99d',`<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}${dot(comp?.obsWind)}</div><div class="cc-sub">${arrow} ${dir}</div><div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`);
   const cl=_ccBox('','Cloud','#c4b5fd',`<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}${dot(comp?.obsCloud)}</div><div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div><div class="cc-sub">${cloudSynopsis(cloud)}</div>`);
   return cond+(secVisible.temp?t:'')+(secVisible.rain?r:'')+(secVisible.wind?w:'')+(secVisible.cloud?cl:'');
@@ -1474,7 +1458,7 @@ function condCard(o){
   const stats=[];
   if(o.today){
     if(o.actualRain!=null) stats.push(_stat(MI_RAIN,o.actualRain.toFixed(1)+' mm','fallen so far','#90caf9'));
-    stats.push(_stat(MI_RAIN,(o.rain||0).toFixed(1)+' mm','expected today','#90caf9'));
+    stats.push(_stat(MI_RAIN,(o.restOfDay??o.rain??0).toFixed(1)+' mm',o.actualRain!=null?'still to come':'expected today','#90caf9'));
     if(o.wind!=null) stats.push(_stat(MI_WIND,`${windWord(o.wind)}${o.dir?' '+o.dir:''}`,Math.round(o.wind)+' km/h','#d9f99d'));
   }else{
     stats.push(_stat(MI_RAIN,(o.rain||0).toFixed(1)+' mm','expected','#90caf9'));
@@ -2748,12 +2732,10 @@ function secGroup(sec,html){
 // ══════════════════════════════════════════
 // VIEW SWITCHING — updates BOTH table AND current bar
 // ══════════════════════════════════════════
-function setView(v,el){
-  state.view=v;
-  savePrefs();
-  syncTfSeg();
-  renderCurrentBar();  // instant update of rain labels/values
-  if(Object.keys(state.data).length)renderTable(); // instant table re-render
+function setView(v,el){   // timeframes removed — always hourly
+  state.view='1h';
+  renderCurrentBar();
+  if(Object.keys(state.data).length)renderTable();
 }
 // Compact timeframe dropdown that lives in the table's top-left corner cell
 function viewDropdown(){
