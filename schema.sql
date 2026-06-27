@@ -53,3 +53,16 @@ CREATE TABLE IF NOT EXISTS stations (
   name      TEXT,
   last_seen TEXT               -- YYYY-MM-DD a client last synced this station
 );
+
+-- ────────────────────────────────────────────────────────────────────────
+-- weights_cache : memoises the on-demand weight computation per location.
+-- Weights are now derived mostly from Open-Meteo's Previous Runs API (the 7
+-- global models' past forecasts at lead 1–7 days) + ERA5/BOM actuals, computed
+-- in the Worker and cached here for ~18 h. The Worker also CREATEs this table
+-- on first use, so applying this file is optional.
+-- ────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS weights_cache (
+  k           TEXT PRIMARY KEY,   -- "latR|lonR|days|station" (lat/lon rounded 0.1°)
+  json        TEXT NOT NULL,      -- full computed result (weights + stats + horizon)
+  computed_at TEXT NOT NULL       -- datetime('now') at compute time
+);

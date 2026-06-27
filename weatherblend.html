@@ -67,6 +67,8 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 .cc-cond-row{display:flex;align-items:center;gap:14px;}
 .cc-cond-word{font-size:17px;font-weight:600;color:var(--text-primary);}
 .cc-daylight{font-size:12.5px;font-weight:500;color:var(--text-dim);}
+.cc-obs{font-size:12px;font-weight:600;color:var(--accent);}
+.obs-dot{font-size:9px;color:var(--accent);vertical-align:super;margin-left:3px;}
 .cc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;}
 .cc-stat{display:flex;flex-direction:column;gap:1px;padding:8px 6px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid var(--border);text-align:center;}
 .cc-stat-l{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-dim);}
@@ -1189,7 +1191,7 @@ function computeCurrentFromHourly(){
   let nowIdx=0;
   for(let k=0;k<ref.time.length;k++){if(new Date(ref.time[k])<=now)nowIdx=k;else break;}
 
-  const wAt=(field,idx)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.[field]?.[idx]??null})),fieldSec(field));
+  const wAt=(field,idx)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.[field]?.[idx]??null})),fieldSec(field),0);
 
   // Current values
   const temp=wAt('temperature_2m',nowIdx);
@@ -1202,12 +1204,12 @@ function computeCurrentFromHourly(){
     const d=state.data[m.key]?.daily; if(!d)return{key:m.key,val:null};
     const di=d.time?.findIndex(t=>t===todayStr)??-1;
     return{key:m.key,val:di>=0?(d.temperature_2m_max?.[di]??null):null};
-  }),'temp');
+  }),'temp',0);
   const lo=weightedAvgOf(onlyEnabled.map(m=>{
     const d=state.data[m.key]?.daily; if(!d)return{key:m.key,val:null};
     const di=d.time?.findIndex(t=>t===todayStr)??-1;
     return{key:m.key,val:di>=0?(d.temperature_2m_min?.[di]??null):null};
-  }),'temp');
+  }),'temp',0);
 
   // Rain today = sum of the blended (AVG) hourly precip across ALL of today's
   // hours (midnight to midnight) — i.e. adding up today's cells of the AVG row.
@@ -1240,7 +1242,20 @@ function computeCurrentFromHourly(){
     });
   }
 
-  return {temp,wind,windDir,wcode,hi,lo,rainToday,cloud,windHi,windLo,cloudHi,cloudLo,actualRainToday};
+  // Prefer BOM's most-recent observation (~half-hourly) for the live "now"
+  // figures — actual measurements beat the model blend for current conditions.
+  let cTemp=temp,cWind=wind,cCloud=cloud;
+  let obsTemp=false,obsWind=false,obsCloud=false,obsTime=null,obsHumid=null;
+  const bl=actualData?._bom?.latest;
+  if(bl&&bl.ts!=null&&(Date.now()-bl.ts)<=75*60*1000){
+    obsTime=bl.label;
+    if(bl.temp!=null){cTemp=bl.temp;obsTemp=true;}
+    if(bl.wind!=null){cWind=bl.wind;obsWind=true;}
+    if(bl.cloud!=null){cCloud=bl.cloud;obsCloud=true;}
+    if(bl.humid!=null)obsHumid=bl.humid;
+  }
+  return {temp:cTemp,wind:cWind,windDir,wcode,hi,lo,rainToday,cloud:cCloud,windHi,windLo,cloudHi,cloudLo,actualRainToday,
+          obsTemp,obsWind,obsCloud,obsTime,obsHumid};
 }
 
 // Selected day in the carousel (date string); null → today
@@ -1261,8 +1276,9 @@ function computeDaySummary(dateStr){
   const today=localTodayStr();
   const isToday=dateStr===today, isFuture=dateStr>today, isPast=dateStr<today;
   const now=new Date();
-  const wAt=(f,i)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.[f]?.[i]??null})),fieldSec(f));
-  const dHL=(field)=>weightedAvgOf(onlyEnabled.map(m=>{const d=state.data[m.key]?.daily;const i=d?.time?.findIndex(t=>t===dateStr)??-1;return{key:m.key,val:i>=0?(d[field]?.[i]??null):null};}),'temp');
+  const hz=horizonOf(dateStr);
+  const wAt=(f,i)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.[f]?.[i]??null})),fieldSec(f),hz);
+  const dHL=(field)=>weightedAvgOf(onlyEnabled.map(m=>{const d=state.data[m.key]?.daily;const i=d?.time?.findIndex(t=>t===dateStr)??-1;return{key:m.key,val:i>=0?(d[field]?.[i]??null):null};}),'temp',hz);
   const hi=dHL('temperature_2m_max'), lo=dHL('temperature_2m_min');
 
   let rain=0,windHi=null,windLo=null,cloudHi=null,cloudLo=null,cloudSum=0,cloudN=0,noonIdx=-1,noonDiff=99;
@@ -1316,11 +1332,15 @@ function buildTodayBoxes(){
   const arrow=dirArrow16(windDir??0), dir=dirFull(windDir??0);
   const narrative=todayNarrative(temp,wcode,night,wind,dir,rainToday,hi,lo);
 
-  const cond=_condTile(wxIcon(wcode,night,phase), wxDesc(wcode,!night), dayExtras(localTodayStr()));
-  const t=_ccBox('cc-temp','Temp','#86efac',`<div class="cc-main">${_T(temp)}</div><div class="cc-sub">Feels ${_T(feels)}</div><div class="cc-sub">↑ ${_T(hi)}　↓ ${_T(lo)}</div>`);
+  const ex=dayExtras(localTodayStr());
+  if(comp?.obsHumid!=null)ex.humid=comp.obsHumid;     // live BOM humidity for "now"
+  const obsTag=comp?.obsTime?`<span class="cc-obs">· obs ${comp.obsTime}</span>`:'';
+  const cond=_condTile(wxIcon(wcode,night,phase), `${wxDesc(wcode,!night)} ${obsTag}`, ex);
+  const dot=on=>on?'<span class="obs-dot" title="BOM observation">●</span>':'';
+  const t=_ccBox('cc-temp','Temp','#86efac',`<div class="cc-main">${_T(temp)}${dot(comp?.obsTemp)}</div><div class="cc-sub">Feels ${_T(feels)}</div><div class="cc-sub">↑ ${_T(hi)}　↓ ${_T(lo)}</div>`);
   const r=_ccBox('','Rain','#90caf9',`<div class="cc-main">${rainToday.toFixed(1)} mm</div><div class="cc-sub">Actual ${actualRain!=null?actualRain.toFixed(1)+' mm':'—'}</div><div class="cc-sub">Expected ${rainToday.toFixed(1)} mm</div>`);
-  const w=_ccBox('','Wind','#d9f99d',`<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}</div><div class="cc-sub">${arrow} ${dir}</div><div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`);
-  const cl=_ccBox('','Cloud','#c4b5fd',`<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}</div><div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div>`);
+  const w=_ccBox('','Wind','#d9f99d',`<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}${dot(comp?.obsWind)}</div><div class="cc-sub">${arrow} ${dir}</div><div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`);
+  const cl=_ccBox('','Cloud','#c4b5fd',`<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}${dot(comp?.obsCloud)}</div><div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div>`);
   return cond+t+r+w+cl;
 }
 
@@ -1393,7 +1413,8 @@ function computeHourSnapshot(iso){
   const onlyEnabled=activeEnabled();if(!onlyEnabled.length)return null;
   const ref=refHourly();if(!ref?.time)return null;
   const idx=ref.time.indexOf(iso);if(idx<0)return null;
-  const wAt=(f)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.[f]?.[idx]??null})),fieldSec(f));
+  const hz=horizonOf(iso.slice(0,10));
+  const wAt=(f)=>weightedAvgOf(onlyEnabled.map(m=>({key:m.key,val:state.data[m.key]?.hourly?.[f]?.[idx]??null})),fieldSec(f),hz);
   const temp=wAt('temperature_2m'),wind=wAt('windspeed_10m'),windDir=wAt('winddirection_10m'),cloud=wAt('cloudcover'),precip=wAt('precipitation');
   const rawCode=state.data[onlyEnabled[0].key]?.hourly?.weathercode?.[idx]??null;
   const code=deriveCondCode(precip,cloud,rawCode);
@@ -1946,6 +1967,7 @@ function parseBomObs(json, stn){
   if(!Array.isArray(obs)||!obs.length)return null;
   obs.sort((a,b)=>(a.local_date_time_full||'').localeCompare(b.local_date_time_full||''));
   const byHour={}; // "YYYY-MM-DDTHH:00" -> { temp, traceCum }
+  let latest=null;  // most-recent raw observation (half-hourly) for live "now" values
   for(const o of obs){
     const raw=o.local_date_time_full; // YYYYMMDDHHmmss (local)
     if(!raw||raw.length<12)continue;
@@ -1956,8 +1978,19 @@ function parseBomObs(json, stn){
     const okt=(o.cloud_oktas==null||o.cloud_oktas==='')?null:parseFloat(o.cloud_oktas);
     const cloudPct=(okt!=null&&!isNaN(okt))?Math.max(0,Math.min(100,okt/8*100)):null;
     const wspd=(o.wind_spd_kmh==null||o.wind_spd_kmh==='')?null:parseFloat(o.wind_spd_kmh);
-    const rec={ temp:(!isNaN(t)&&String(o.air_temp).trim()!=='')?t:null, traceCum:parseBomRain(o.rain_trace), cloud:cloudPct, wind:(wspd!=null&&!isNaN(wspd))?wspd:null };
+    const rh=(o.rel_hum==null||o.rel_hum==='')?null:parseFloat(o.rel_hum);
+    const tempV=(!isNaN(t)&&String(o.air_temp).trim()!=='')?t:null;
+    const windV=(wspd!=null&&!isNaN(wspd))?wspd:null;
+    const rec={ temp:tempV, traceCum:parseBomRain(o.rain_trace), cloud:cloudPct, wind:windV };
     if(min===0 || !(hourKey in byHour)) byHour[hourKey]=rec; // :00 wins, :30 fills gaps
+    // Track the genuinely latest reading (UTC ms for a tz-safe recency check)
+    const u=o.aifstime_utc;
+    let ts=null;
+    if(u&&u.length>=12)ts=Date.UTC(+u.slice(0,4),+u.slice(4,6)-1,+u.slice(6,8),+u.slice(8,10),+u.slice(10,12),0);
+    const h12=((+hr)%12)||12, ap=(+hr)<12?'am':'pm';
+    if(ts!=null&&(latest==null||ts>=latest.ts)){
+      latest={ ts, label:`${h12}:${raw.slice(10,12)} ${ap}`, temp:tempV, wind:windV, cloud:cloudPct, humid:(rh!=null&&!isNaN(rh))?rh:null };
+    }
   }
   const keys=Object.keys(byHour).sort();
   const hourly={time:[],temperature_2m:[],precipitation:[],cloudcover:[],windspeed_10m:[]};
@@ -1992,7 +2025,7 @@ function parseBomObs(json, stn){
     daily.temperature_2m_min.push(ts.length?Math.min(...ts):null);
     daily.precipitation_sum.push(byDate[d].precip);
   }
-  return { hourly, daily, source:'BOM', stationName:stn.name||('WMO '+stn.wmo), wmo:stn.wmo, state:stn.state, lat:stn.lat, lon:stn.lon };
+  return { hourly, daily, latest, source:'BOM', stationName:stn.name||('WMO '+stn.wmo), wmo:stn.wmo, state:stn.state, lat:stn.lat, lon:stn.lon };
 }
 
 async function fetchBOMActuals(){
@@ -2066,6 +2099,8 @@ async function fetchActualsAndComputeWeights(){
 // pulls back per-model weights learned from real forecast-vs-observed error.
 // ══════════════════════════════════════════
 let historicalWeights=null, accuracyStats=null, accuracyMeta=null, _trackStation=null;
+let historicalWeightsByH=null;                 // {N -> {temp,rain,wind,cloud}->{model->w}}
+let metricWeightsByH={};                        // normalised per-horizon weights for the active models
 let _horizonCache={}, _horizonMetric='temp';
 
 // Per-model daily aggregate for one date, derived from that model's hourly grid
@@ -2107,8 +2142,10 @@ async function syncAndLoadAccuracy(){
   _trackStation=station;
   const today=localTodayStr();
   const dates=carouselDates().filter(d=>d>=today).slice(0,8);   // today + next 7
+  // Only BOM's published forecast is archived server-side now — the 7 global
+  // models' past forecasts are pulled on demand from the Previous Runs API.
   const forecasts=[];
-  activeEnabled().forEach(m=>{ dates.forEach(d=>{const a=modelDay(m.key,d); if(a)forecasts.push({target:d,model:m.key,...a});}); });
+  if(state.data['bom_forecast']){ dates.forEach(d=>{const a=modelDay('bom_forecast',d); if(a)forecasts.push({target:d,model:'bom_forecast',...a});}); }
   const actuals=bomDailyActuals();
   const b=actualData?._bom||{};
   const meta={lat:b.lat??state.lat, lon:b.lon??state.lon, state:b.state||'', name:b.stationName||''};
@@ -2116,19 +2153,21 @@ async function syncAndLoadAccuracy(){
   try{
     await fetch(`${BOM_WORKER_URL}/track/sync`,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({station,issued:today,forecasts,actuals,meta})});
-    dbg(`accuracy: synced ${forecasts.length} forecasts, ${actuals.length} actuals`);
+    dbg(`accuracy: synced ${forecasts.length} BOM-forecast rows, ${actuals.length} actuals`);
   }catch(e){ dbg('accuracy sync POST failed: '+e.message); }
 
   try{
-    const r=await fetch(`${BOM_WORKER_URL}/track/weights?station=${encodeURIComponent(station)}&days=60`,{signal:AbortSignal.timeout(15000)});
+    const ll=`&lat=${state.lat}&lon=${state.lon}`;
+    const r=await fetch(`${BOM_WORKER_URL}/track/weights?station=${encodeURIComponent(station)}${ll}&days=60`,{signal:AbortSignal.timeout(25000)});
     const j=await r.json();
     accuracyMeta=j; accuracyStats=j&&j.stats||null; _horizonCache={};
     if(j&&j.weights&&j.mature){
-      historicalWeights=j.weights; applyHistoricalWeights();
-      dbg(`accuracy: USING learned weights — ${j.days} days, ${j.pairs} pairs`);
+      historicalWeights=j.weights; historicalWeightsByH=j.weightsByHorizon||null; applyHistoricalWeights();
+      const nH=historicalWeightsByH?Object.keys(historicalWeightsByH).length:0;
+      dbg(`accuracy: USING learned weights — ${j.days} days, ${j.pairs} pairs, ${nH} lead-times (${j.source||'?'}${j.cached?', cached':''})`);
       if(Object.keys(state.data).length){ renderCurrentBar(); buildSourcesPanel(); renderTable(); }
     }else{
-      historicalWeights=null;
+      historicalWeights=null; historicalWeightsByH=null; metricWeightsByH={};
       dbg(`accuracy: learning ${j&&j.days||0}/${j&&j.matureAt||14} days — live weighting for now`);
     }
   }catch(e){ dbg('accuracy weights GET failed: '+e.message); }
@@ -2139,12 +2178,25 @@ async function syncAndLoadAccuracy(){
 function applyHistoricalWeights(){
   if(!historicalWeights)return;
   const am=activeEnabled();
-  ['temp','rain','wind','cloud'].forEach(s=>{
-    const src=historicalWeights[s]||{}; const w={}; let any=false;
-    am.forEach(m=>{ if(src[m.key]!=null){w[m.key]=src[m.key];any=true;} });
-    if(any){ const sum=am.reduce((a,m)=>a+(w[m.key]||0),0)||1; metricWeights[s]={}; am.forEach(m=>metricWeights[s][m.key]=(w[m.key]||0)/sum); }
-  });
+  const normInto=(target,src)=>{
+    ['temp','rain','wind','cloud'].forEach(s=>{
+      const sw=src[s]||{}; const w={}; let any=false;
+      am.forEach(m=>{ if(sw[m.key]!=null){w[m.key]=sw[m.key];any=true;} });
+      if(any){ const sum=am.reduce((a,m)=>a+(w[m.key]||0),0)||1; target[s]={}; am.forEach(m=>target[s][m.key]=(w[m.key]||0)/sum); }
+    });
+  };
+  // Pooled weights (fallback for today / lead 0 and >7-day horizons)
+  normInto(metricWeights, historicalWeights);
   modelWeights={}; am.forEach(m=>modelWeights[m.key]=((metricWeights.temp[m.key]||0)+(metricWeights.rain[m.key]||0)+(metricWeights.wind[m.key]||0)+(metricWeights.cloud[m.key]||0))/4);
+  // Per-horizon weights (lead 1–7 days), each renormalised over active models
+  metricWeightsByH={};
+  if(historicalWeightsByH){
+    Object.keys(historicalWeightsByH).forEach(N=>{
+      const tgt={temp:{},rain:{},wind:{},cloud:{}};
+      normInto(tgt, historicalWeightsByH[N]||{});
+      metricWeightsByH[N]=tgt;
+    });
+  }
 }
 
 // Reference hourly grid (first enabled model)
@@ -2324,11 +2376,28 @@ function wBadge(sec,key){
   const cls=pct>=20?'high':pct>=10?'mid':'low';
   return '<span style="font-size:10px;color:var(--text-muted)"><span class="weight-badge '+cls+'">'+pct+'%</span></span>';
 }
-function weightedAvgOf(modelValPairs,sec){
+// Lead time (whole days) of a date from today: today=0, tomorrow=1, …
+function horizonOf(dateStr){
+  if(!dateStr)return null;
+  return Math.round((new Date(dateStr+'T12:00:00')-new Date(localTodayStr()+'T12:00:00'))/86400000);
+}
+// Pick the weight map for a metric at a given lead time. Learned per-horizon
+// weights (lead 1–7) take precedence; today (0) borrows the 1-day set; beyond 7
+// borrows the 7-day set; otherwise fall back to the pooled weights.
+function weightsForH(sec,horizon){
+  if(horizon!=null && metricWeightsByH && Object.keys(metricWeightsByH).length){
+    const eff=Math.min(7,Math.max(1,horizon));
+    const set=metricWeightsByH[eff];
+    if(set && set[sec] && Object.keys(set[sec]).length)return set[sec];
+  }
+  return (metricWeights[sec]&&Object.keys(metricWeights[sec]).length)?metricWeights[sec]:null;
+}
+function weightedAvgOf(modelValPairs,sec,horizon){
   const valid=modelValPairs.filter(p=>p.val!=null&&!isNaN(p.val));
   if(!valid.length)return null;
-  // Pick the weight map: per-metric if a section is given, else overall
-  const W=(sec&&metricWeights[sec]&&Object.keys(metricWeights[sec]).length)?metricWeights[sec]:modelWeights;
+  // Pick the weight map: per-horizon/per-metric if available, else overall
+  const Wmap=sec?weightsForH(sec,horizon):null;
+  const W=(Wmap&&Object.keys(Wmap).length)?Wmap:modelWeights;
   if(!useWeightedAvg||!Object.keys(W).length){
     return valid.reduce((s,p)=>s+p.val,0)/valid.length;
   }
@@ -3253,7 +3322,7 @@ async function loadHorizon(metric){
   let j=_horizonCache[metric];
   if(!j){
     host.innerHTML='<div class="acc-na" style="padding:8px 2px">Loading…</div>';
-    try{ const r=await fetch(`${BOM_WORKER_URL}/track/horizon?station=${encodeURIComponent(_trackStation)}&days=60&metric=${metric}`,{signal:AbortSignal.timeout(15000)}); j=await r.json(); _horizonCache[metric]=j; }
+    try{ const ll=`&lat=${state.lat}&lon=${state.lon}`; const r=await fetch(`${BOM_WORKER_URL}/track/horizon?station=${encodeURIComponent(_trackStation)}${ll}&days=60&metric=${metric}`,{signal:AbortSignal.timeout(25000)}); j=await r.json(); _horizonCache[metric]=j; }
     catch(e){ host.innerHTML='<div class="acc-na" style="padding:8px 2px">Could not load lead-time data.</div>'; return; }
   }
   host.innerHTML=horizonMatrixHTML(j,metric);
