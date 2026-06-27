@@ -294,6 +294,10 @@ async function writeCapture(env, station, issued, forecasts, actuals) {
 // archived). The whole result is cached per location for ~18 h.
 const PREV_MODELS = ["gfs_seamless","ecmwf_ifs025","icon_seamless","gem_seamless","ukmo_seamless","cma_grapes_global","jma_seamless"];
 const PREV_BASE   = ["temperature_2m","precipitation","cloud_cover","wind_speed_10m"];
+// Lead times to request. Some models archive fewer "previous_day" steps than
+// others; requesting a step a model doesn't have 400s the whole call. 5 days is
+// the most every global model reliably provides (and covers the useful horizons).
+const PREV_DAYS = 5;
 const CACHE_DDL = "CREATE TABLE IF NOT EXISTS weights_cache (k TEXT PRIMARY KEY, json TEXT NOT NULL, computed_at TEXT NOT NULL)";
 
 function cacheKey(lat, lon, days, station) {
@@ -332,10 +336,10 @@ async function trackWeights(url, env) {
 // ── Data sources ──────────────────────────────────────────────────────────
 async function fetchPrevRuns(lat, lon, model, days) {
   const vars = [];
-  for (const b of PREV_BASE) for (let n = 1; n <= 7; n++) vars.push(`${b}_previous_day${n}`);
+  for (const b of PREV_BASE) for (let n = 1; n <= PREV_DAYS; n++) vars.push(`${b}_previous_day${n}`);
   const u = `https://previous-runs-api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
             `&hourly=${vars.join(",")}&models=${model}&past_days=${days}&forecast_days=1&timezone=auto&wind_speed_unit=kmh`;
-  try { const r = await fetch(u, { signal: AbortSignal.timeout(20000) }); if (!r.ok) return null; return await r.json(); }
+  try { const r = await fetch(u, { signal: AbortSignal.timeout(30000) }); if (!r.ok) return null; return await r.json(); }
   catch { return null; }
 }
 
@@ -347,7 +351,7 @@ function aggregatePrev(h) {
   for (let i = 0; i < T.length; i++) {
     const d = String(T[i]).slice(0, 10);
     let day = out[d]; if (!day) { day = {}; out[d] = day; }
-    for (let n = 1; n <= 7; n++) {
+    for (let n = 1; n <= PREV_DAYS; n++) {
       const tv = h[`temperature_2m_previous_day${n}`] && h[`temperature_2m_previous_day${n}`][i];
       const pv = h[`precipitation_previous_day${n}`]   && h[`precipitation_previous_day${n}`][i];
       const cv = h[`cloud_cover_previous_day${n}`]     && h[`cloud_cover_previous_day${n}`][i];
@@ -368,13 +372,15 @@ function aggregatePrev(h) {
 }
 
 async function fetchEra5(lat, lon, days) {
-  const end   = new Date(Date.now() - 86400000).toISOString().slice(0, 10);              // yesterday
+  // ERA5 lags ~5 days; asking for more recent dates 400s the whole request, so
+  // end the window safely in the past. BOM observations cover the recent days.
+  const end   = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
   const start = new Date(Date.now() - (days + 1) * 86400000).toISOString().slice(0, 10);
   const u = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}` +
             `&start_date=${start}&end_date=${end}` +
             `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max` +
             `&hourly=cloud_cover&timezone=auto&wind_speed_unit=kmh`;
-  try { const r = await fetch(u, { signal: AbortSignal.timeout(20000) }); if (!r.ok) return {}; return era5ToDaily(await r.json()); }
+  try { const r = await fetch(u, { signal: AbortSignal.timeout(30000) }); if (!r.ok) return {}; return era5ToDaily(await r.json()); }
   catch { return {}; }
 }
 function era5ToDaily(j) {
@@ -479,10 +485,21 @@ function statsFromGroup(models, groupOf) {
 }
 
 // ── The computation ─────────────────────────────────────────────────────────
+async function fetchPrevBatched(lat, lon, days) {
+  // Fetch in small batches so 7 large parallel requests don't time each other out.
+  const out = [];
+  const BATCH = 3;
+  for (let i = 0; i < PREV_MODELS.length; i += BATCH) {
+    const slice = PREV_MODELS.slice(i, i + BATCH);
+    const res = await Promise.all(slice.map(m => fetchPrevRuns(lat, lon, m, days)));
+    out.push(...res);
+  }
+  return out;
+}
 async function computeWeights(env, lat, lon, station, days) {
   if (env.DB) { try { await env.DB.prepare(CACHE_DDL).run(); } catch {} }
   const [prevResults, era, bomFc, bomAc] = await Promise.all([
-    Promise.all(PREV_MODELS.map(m => fetchPrevRuns(lat, lon, m, days))),
+    fetchPrevBatched(lat, lon, days),
     fetchEra5(lat, lon, days),
     (env.DB && station) ? bomForecastMap(env, station, days) : Promise.resolve({}),
     (env.DB && station) ? bomActualsMap(env, station, days)  : Promise.resolve({})
@@ -490,9 +507,11 @@ async function computeWeights(env, lat, lon, station, days) {
   const actual = mergeActuals(bomAc, era);
 
   const fc = {};
-  PREV_MODELS.forEach((m, i) => { const j = prevResults[i]; fc[m] = (j && j.hourly) ? aggregatePrev(j.hourly) : {}; });
+  const modelsOK = [];
+  PREV_MODELS.forEach((m, i) => { const j = prevResults[i]; const ok = !!(j && j.hourly); fc[m] = ok ? aggregatePrev(j.hourly) : {}; if (ok) modelsOK.push(m); });
   fc["bom_forecast"] = bomFc;
   const MODELS_ALL = [...PREV_MODELS, "bom_forecast"];
+  const diag = { modelsOK, modelsFailed: PREV_MODELS.filter(m => !modelsOK.includes(m)), eraDays: Object.keys(era).length, bomActualDays: Object.keys(bomAc).length };
 
   const MET = ["tmax", "tmin", "rain", "wind", "cloud"];
   const acc = {}; MODELS_ALL.forEach(m => { acc[m] = { met: {}, hz: {} }; MET.forEach(k => acc[m].met[k] = { se: 0, n: 0 }); });
@@ -526,7 +545,7 @@ async function computeWeights(env, lat, lon, station, days) {
   // Per-horizon weights (lead 1–7 days): each displayed day is blended with the
   // weight set learned at its own lead time, so near days lean on near-term skill.
   const weightsByHorizon = {};
-  for (let N = 1; N <= 7; N++) {
+  for (let N = 1; N <= PREV_DAYS; N++) {
     const statsN = statsFromGroup(MODELS_ALL, m => acc[m].hz[N]);
     if (statsN.length) weightsByHorizon[N] = deriveWeights(statsN);
   }
@@ -551,6 +570,7 @@ async function computeWeights(env, lat, lon, station, days) {
     station: station || null, window: days, days: ndays, pairs,
     mature: ndays >= MATURE_DAYS, matureAt: MATURE_DAYS,
     weights: stats.length ? weights : null, weightsByHorizon, stats, horizon,
+    diag,
     source: "previous-runs+era5+bom", generated: new Date().toISOString()
   };
 }
