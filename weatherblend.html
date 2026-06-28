@@ -87,15 +87,19 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 .cc-box{background:rgba(255,255,255,0.032);border:1px solid var(--border);border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden;}
 /* NOW / conditions headline card (spans full width) */
 .cc-box.cc-cond{grid-column:1 / -1;gap:0;padding:14px 16px;background:rgba(18,26,40,0.46);border-color:rgba(255,255,255,.09);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
-.cc-now-head{font-size:11.5px;font-weight:700;letter-spacing:1.4px;color:var(--text-dim);margin-bottom:5px;}
-.cc-now-main{display:flex;align-items:center;gap:14px;}
+.cc-now-syn{font-size:14px;line-height:1.4;color:var(--text-muted);font-weight:500;margin-bottom:11px;}
+.cc-now-main{display:flex;align-items:center;gap:13px;}
 .cc-now-icon{flex-shrink:0;}
-.cc-now-icon .wxi{width:60px;height:60px;filter:drop-shadow(0 3px 9px rgba(0,0,0,.55));}
+.cc-now-icon .wxi{width:58px;height:58px;filter:drop-shadow(0 3px 9px rgba(0,0,0,.55));}
 .cc-now-temp{display:flex;flex-direction:column;min-width:0;}
-.cc-now-big{font-size:46px;font-weight:300;letter-spacing:-2px;line-height:1;}
-.cc-now-lo{font-size:25px;font-weight:300;color:var(--text-dim);margin-left:9px;letter-spacing:-1px;}
+.cc-now-big{font-size:44px;font-weight:300;letter-spacing:-2px;line-height:1;}
+.cc-now-lo{font-size:24px;font-weight:300;color:var(--text-dim);margin-left:8px;letter-spacing:-1px;}
 .cc-now-feels{font-size:13px;color:var(--text-muted);margin-top:3px;}
-.cc-now-narr{font-size:13.5px;line-height:1.5;color:var(--text-muted);margin-top:11px;}
+.cc-now-side{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right;}
+.cc-now-rain{font-size:27px;font-weight:600;letter-spacing:-.5px;line-height:1;}
+.cc-now-sub{font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px;}
+.cns-i{display:inline-flex;}
+.cns-i svg{width:14px;height:14px;}
 .cc-now-stats{display:flex;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--border);}
 .now-chart{margin-top:13px;padding-top:12px;border-top:1px solid var(--border);}
 .nc-row{display:flex;align-items:center;gap:10px;height:30px;}
@@ -705,7 +709,7 @@ function buildSourcesPanel(){
     `<div class="config-row-label">Learning window</div>`+
     `<div class="learn-row">`+
     `<select class="learn-select" onchange="setLearnDays(this.value)">`+
-    [14,21,35,60,90].map(d=>`<option value="${d}"${learnDays===d?' selected':''}>${d} days</option>`).join('')+
+    [1,3,7,14,21,35,60,90].map(d=>`<option value="${d}"${learnDays===d?' selected':''}>${d} day${d>1?'s':''}</option>`).join('')+
     `</select>`+
     `<span class="learn-hint">Days of history used to score model accuracy</span>`+
     `</div></div>`+
@@ -786,7 +790,7 @@ function toggleActuals(btn){
 }
 function setLearnDays(v){
   const d=parseInt(v,10); if(isNaN(d))return;
-  learnDays=Math.max(7,Math.min(90,d));
+  learnDays=Math.max(1,Math.min(90,d));
   savePrefs();
   // Re-pull learned weights over the new window, then re-render
   historicalWeights=null; historicalWeightsByH=null; accuracyMeta=null; accuracyStats=null; _horizonCache={};
@@ -934,7 +938,7 @@ function loadPrefs(){
     if(p.verticalLayout!==undefined)verticalLayout=p.verticalLayout;
     if(p.showDebug!==undefined)showDebug=p.showDebug;
     if(p.showActuals!==undefined)showActuals=p.showActuals;
-    if(p.learnDays!==undefined&&p.learnDays>=7&&p.learnDays<=90)learnDays=p.learnDays;
+    if(p.learnDays!==undefined&&p.learnDays>=1&&p.learnDays<=90)learnDays=p.learnDays;
     if(p.secVisible)Object.assign(secVisible,p.secVisible);
     if(p.secDetail)Object.assign(secDetail,p.secDetail);
     if(p.enabled){enabled.clear();p.enabled.forEach(k=>{if(MODELS.find(m=>m.key===k))enabled.add(k);});}
@@ -1369,7 +1373,15 @@ function buildTodayBoxes(){
   const dot=on=>on?'<span class="obs-dot" title="BOM observation">●</span>':'';
   const t=_ccBox('cc-temp','Temp','#86efac',`<div class="cc-main">${_T(temp)}${dot(comp?.obsTemp)}</div><div class="cc-sub">Feels ${_T(feels)}</div><div class="cc-sub">↑ ${_T(hi)}　↓ ${_T(lo)}</div>`);
   const rainRemain=comp?.rainRemainToday??Math.max(0,rainToday-(actualRain||0));
-  const r=_ccBox('','Rain','#90caf9',`<div class="cc-main">${rainToday.toFixed(1)} mm</div><div class="cc-sub">Actual ${actualRain!=null?actualRain.toFixed(1)+' mm':'—'}</div><div class="cc-sub">Rest of day ${rainRemain.toFixed(1)} mm</div>`);
+  let rainBody;
+  if(actualRain!=null){
+    const totDisp=(actualRain+(rainRemain||0)).toFixed(1), aDisp=actualRain.toFixed(1);
+    const restDisp=Math.max(0,parseFloat(totDisp)-parseFloat(aDisp)).toFixed(1);  // forced so A+Rest=Total
+    rainBody=`<div class="cc-main">${totDisp} mm</div><div class="cc-sub">Actual ${aDisp} mm</div><div class="cc-sub">Rest of day ${restDisp} mm</div>`;
+  }else{
+    rainBody=`<div class="cc-main">${rainToday.toFixed(1)} mm</div><div class="cc-sub">Day total</div><div class="cc-sub">${rainToday<0.2?'Dry day expected':'Expected today'}</div>`;
+  }
+  const r=_ccBox('','Rain','#90caf9',rainBody);
   const w=_ccBox('','Wind','#d9f99d',`<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}${dot(comp?.obsWind)}</div><div class="cc-sub">${arrow} ${dir}</div><div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`);
   const cl=_ccBox('','Cloud','#c4b5fd',`<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}${dot(comp?.obsCloud)}</div><div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div><div class="cc-sub">${cloudSynopsis(cloud)}</div>`);
   return cond+(secVisible.temp?t:'')+(secVisible.rain?r:'')+(secVisible.wind?w:'')+(secVisible.cloud?cl:'');
@@ -1447,17 +1459,21 @@ function nowNarrative(o){
   const tw=t==null?'mild':(t<4?'cold':t<10?'cool':t<17?'mild':t<25?'warm':'hot');
   const h=new Date().getHours();
   const tod=h<5?'night':h<11?'morning':h<17?'afternoon':h<21?'evening':'night';
-  const wet=(o.rain>1)?'wet':((o.actualRain>0.1||o.rain>0.2)?'damp':((o.cloud!=null&&o.cloud>70)?'grey':'fine'));
   const night=(tod==='night');
+  const rest=o.restOfDay??0;               // what's still forecast to fall today
+  const raining=_isRainCode(o.code);       // raining at this moment
+  // "wet/damp" only describes what's still to come — not rain that already fell.
+  const wet = rest>1?'wet':((rest>0.2||raining)?'damp':((o.cloud!=null&&o.cloud>78)?'grey':null));
   let clause;
-  if(_isRainCode(o.code))      clause=(o.rain>4?'steady rain':'light showers')+(h>=17||h<6?' continuing through the night':' about');
-  else if(_isStormCode(o.code))clause='the chance of a thunderstorm';
-  else if(_isSnowCode(o.code)) clause='snow showers about';
+  if(rest>0.4)                  clause=(rest>4?'steady rain':'showers')+((h>=15||h<6)?' about':' developing');
+  else if(raining)              clause='showers easing';
+  else if(_isStormCode(o.code)) clause='the chance of a storm';
   else if(o.code===45||o.code===48) clause='areas of fog';
-  else if(o.cloud!=null&&o.cloud>70) clause='overcast skies';
+  else if(o.cloud!=null&&o.cloud>78) clause='overcast skies';
   else if(o.cloud!=null&&o.cloud>30) clause=night?'patchy cloud':'a mix of sun and cloud';
   else clause=night?'clear skies':'plenty of sunshine';
-  return _cap(`a ${tw}, ${wet} ${tod} with ${clause}`)+'.';
+  const lead = wet ? `a ${tw}, ${wet} ${tod}` : `a ${tw} ${tod}`;
+  return _cap(`${lead} with ${clause}`)+'.';
 }
 function dayNarrative(o){
   const c=o.code; let clause;
@@ -1515,9 +1531,15 @@ function _dayHourPoints(dateStr){
 function _sparkline(vals,o){
   const W=240,H=30,padX=2,padT=5,padB=4,n=vals.length;
   const valid=vals.filter(v=>v!=null&&!isNaN(v)); if(!valid.length)return '<div class="spark"></div>';
-  let mn=Math.min(...valid),mx=Math.max(...valid); if(o.zeroBase)mn=0; if(mn===mx){mn-=1;mx+=1;}
+  let mn=Math.min(...valid),mx=Math.max(...valid);
+  if(o.zeroBase)mn=0;
+  if(o.absMin!=null)mn=o.absMin;
+  if(o.absMax!=null)mx=o.absMax;
+  if(o.floorMax!=null)mx=Math.max(mx,o.floorMax);          // keep tiny values tiny
+  if(o.minRange!=null && (mx-mn)<o.minRange){ const c=(mx+mn)/2; mn=c-o.minRange/2; mx=c+o.minRange/2; if(o.zeroBase&&mn<0){mx-=mn;mn=0;} }
+  if(mn===mx){mn-=1;mx+=1;}
   const X=i=> padX + (n>1? i*(W-2*padX)/(n-1):0);
-  const Y=v=> v==null?null : (H-padB) - (v-mn)/(mx-mn)*(H-padT-padB);
+  const Y=v=> v==null?null : (H-padB) - (Math.max(mn,Math.min(mx,v))-mn)/(mx-mn)*(H-padT-padB);
   const pts=vals.map((v,i)=> v==null?null:[X(i),Y(v)]);
   const path=arr=>{let d='',on=false;arr.forEach(p=>{if(!p){on=false;return;}d+=(on?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)+' ';on=true;});return d.trim();};
   const cut=(o.split==null?1:o.split)*(W-2*padX)+padX;
@@ -1541,40 +1563,34 @@ function nowChartHTML(dateStr){
   const now=isToday?p.nowFrac:null;
   const g=_sgid++;
   const rows=[
-    {ic:MI_TEMP,c:'#86efac',vals:p.temp,ramp:_rampTemp,gid:'sgT'+g},
-    {ic:MI_RAIN,c:'#60a5fa',vals:p.rain,ramp:_rampRain,gid:'sgR'+g,zero:true},
-    {ic:MI_WIND,c:'#a3e635',vals:p.wind,ramp:_rampWind,gid:'sgW'+g,zero:true},
-    {ic:MI_CLOUD,c:'#c4b5fd',vals:p.cloud,ramp:_rampCloud,gid:'sgC'+g,zero:true}
+    {ic:MI_TEMP,c:'#86efac',vals:p.temp,ramp:_rampTemp,gid:'sgT'+g,sc:{minRange:6}},
+    {ic:MI_RAIN,c:'#60a5fa',vals:p.rain,ramp:_rampRain,gid:'sgR'+g,sc:{zeroBase:true,floorMax:4}},
+    {ic:MI_WIND,c:'#a3e635',vals:p.wind,ramp:_rampWind,gid:'sgW'+g,sc:{zeroBase:true,floorMax:30}},
+    {ic:MI_CLOUD,c:'#c4b5fd',vals:p.cloud,ramp:_rampCloud,gid:'sgC'+g,sc:{absMin:0,absMax:100}}
   ];
-  const body=rows.map(r=>`<div class="nc-row"><span class="nc-ico" style="color:${r.c}">${r.ic}</span><div class="nc-spark">${_sparkline(r.vals,{color:r.c,ramp:r.ramp,zeroBase:r.zero,split,now,gid:r.gid})}</div></div>`).join('');
+  const body=rows.map(r=>`<div class="nc-row"><span class="nc-ico" style="color:${r.c}">${r.ic}</span><div class="nc-spark">${_sparkline(r.vals,Object.assign({color:r.c,ramp:r.ramp,split,now,gid:r.gid},r.sc))}</div></div>`).join('');
   const legend=`<div class="nc-legend"><span><i class="ncl-line"></i>Observed</span><span><i class="ncl-dash"></i>Forecast</span></div>`;
   return `<div class="now-chart">${body}${legend}</div>`;
 }
 function condCard(o){
-  const head=(o.condWord||'').toUpperCase();
-  let big,feels='';
-  if(o.today){
-    big=`<div class="cc-now-big" style="color:${tempColor(o.temp)}">${o.temp!=null?tempDisp(o.temp)+'°':'—'}</div>`;
-    feels=o.feels!=null?`<div class="cc-now-feels">Feels like ${tempDisp(o.feels)}°</div>`:'';
-  }else{
-    big=`<div class="cc-now-big" style="color:${tempColor(o.hi)}">${o.hi!=null?Math.round(o.hi)+'°':'—'}<span class="cc-now-lo">${o.lo!=null?Math.round(o.lo)+'°':''}</span></div>`;
-  }
-  const narr=o.today?nowNarrative(o):dayNarrative(o);
-  const stats=[];
-  if(o.today){
-    if(o.actualRain!=null) stats.push(_stat(MI_RAIN,o.actualRain.toFixed(1)+' mm','fallen so far','#90caf9'));
-    stats.push(_stat(MI_RAIN,(o.restOfDay??o.rain??0).toFixed(1)+' mm',o.actualRain!=null?'still to come':'expected today','#90caf9'));
-    if(o.wind!=null) stats.push(_stat(MI_WIND,`${windWord(o.wind)}${o.dir?' '+o.dir:''}`,Math.round(o.wind)+' km/h','#d9f99d'));
-  }else{
-    stats.push(_stat(MI_RAIN,(o.rain||0).toFixed(1)+' mm','expected','#90caf9'));
-    if(o.windPeak!=null) stats.push(_stat(MI_WIND,`${windWord(o.windPeak)}${o.dir?' '+o.dir:''}`,'to '+Math.round(o.windPeak)+' km/h','#d9f99d'));
-    if(o.cloud!=null) stats.push(_stat(MI_CLOUD,Math.round(o.cloud)+'%','cloud','#c4b5fd'));
-  }
+  const isT=o.today;
+  const tempVal=isT?o.temp:o.hi;
+  const big=`<div class="cc-now-big" style="color:${tempColor(tempVal)}">${tempVal!=null?(isT?tempDisp(tempVal):Math.round(tempVal))+'°':'—'}${(!isT&&o.lo!=null)?`<span class="cc-now-lo">${Math.round(o.lo)}°</span>`:''}</div>`;
+  const sub2=isT?(o.feels!=null?`Feels like ${tempDisp(o.feels)}°`:''):'';
+  const rainV=isT?o.rain:((o.past&&o.actualRain!=null)?o.actualRain:o.rain), windV=isT?o.wind:o.windPeak, cloudV=o.cloud;
+  const side=`<div class="cc-now-side">
+    <div class="cc-now-rain" style="color:#60a5fa">${rainV!=null?rainV.toFixed(1)+' mm':'—'}</div>
+    <div class="cc-now-sub" style="color:#a3e635"><span class="cns-i">${MI_WIND}</span>${windV!=null?Math.round(windV)+' km/h':'—'}${o.dir?' '+o.dir:''}</div>
+    <div class="cc-now-sub" style="color:#c4b5fd"><span class="cns-i">${MI_CLOUD}</span>${cloudV!=null?Math.round(cloudV)+'%':'—'}</div>
+  </div>`;
+  const narr=isT?nowNarrative(o):dayNarrative(o);
   return `<div class="cc-box cc-cond cc-now">
-    <div class="cc-now-head">${head||'CONDITIONS'}</div>
-    <div class="cc-now-main"><div class="cc-icon cc-now-icon">${o.icon}</div><div class="cc-now-temp">${big}${feels}</div></div>
-    ${narr?`<div class="cc-now-narr">${narr}</div>`:''}
-    ${stats.length?`<div class="cc-now-stats">${stats.join('')}</div>`:''}
+    ${narr?`<div class="cc-now-syn">${narr}</div>`:''}
+    <div class="cc-now-main">
+      <div class="cc-icon cc-now-icon">${o.icon}</div>
+      <div class="cc-now-temp">${big}${sub2?`<div class="cc-now-feels">${sub2}</div>`:''}</div>
+      ${side}
+    </div>
     ${o.dateStr?nowChartHTML(o.dateStr):''}
   </div>`;
 }
