@@ -51,10 +51,10 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 .drawer-item:hover{border-color:var(--accent);background:rgba(96,165,250,.08);}
 .drawer-item svg{color:var(--text-muted);flex-shrink:0;}
 /* Sticky date bar */
-.datebar{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;padding:8px 16px;background:var(--bg);border-bottom:1px solid var(--border);}
-.date-nav{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-muted);cursor:pointer;transition:all .15s;}
-.date-nav:hover{color:var(--text-primary);border-color:var(--accent);}
-.date-nav:active{transform:scale(.92);}
+.datebar{position:relative;display:flex;align-items:center;justify-content:space-between;padding:9px 22px;background:var(--bg);border-bottom:1px solid var(--border);}
+.date-nav{background:none;border:none;padding:6px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;transition:color .15s,transform .1s;}
+.date-nav:hover{color:var(--text-primary);}
+.date-nav:active{transform:scale(.85);}
 .cur-date{cursor:pointer;}
 .hdr-right{display:flex;align-items:center;gap:8px;}
 
@@ -439,9 +439,9 @@ body{padding-bottom:64px;}
 
 <!-- Sticky date bar with day navigation -->
 <div class="datebar" id="datebar">
-  <button class="date-nav" onclick="stepDay(-1)" aria-label="Previous day"><svg viewBox="0 0 10 12" width="13" height="15"><polygon points="9,0 9,12 0,6" fill="currentColor"/></svg></button>
+  <button class="date-nav" onclick="stepDay(-1)" aria-label="Previous day"><svg viewBox="0 0 10 12" width="15" height="18"><polygon points="9,0 9,12 0,6" fill="currentColor"/></svg></button>
   <div class="cur-date" id="curr-date" onclick="goToToday()" title="Jump to today">–</div>
-  <button class="date-nav" onclick="stepDay(1)" aria-label="Next day"><svg viewBox="0 0 10 12" width="13" height="15"><polygon points="1,0 1,12 10,6" fill="currentColor"/></svg></button>
+  <button class="date-nav" onclick="stepDay(1)" aria-label="Next day"><svg viewBox="0 0 10 12" width="15" height="18"><polygon points="1,0 1,12 10,6" fill="currentColor"/></svg></button>
 </div>
 </div><!-- /topbar -->
 
@@ -1225,6 +1225,9 @@ async function fetchCurrentConditions(){
 
 
 // Compute current conditions from models' hourly data (avg/weighted per toggle)
+// A rain hour shown in the table is 0 when <0.05mm, else rounded to 0.1mm.
+// Sum rain the SAME way so card totals equal the sum of the table's cells.
+function _rcell(v){ return (v==null||v<0.05)?0:Math.round(v*10)/10; }
 function computeCurrentFromHourly(){
   const onlyEnabled=activeEnabled();if(!onlyEnabled.length)return null;
   const ref=state.data[onlyEnabled[0].key]?.hourly;if(!ref)return null;
@@ -1254,8 +1257,8 @@ function computeCurrentFromHourly(){
     const future=new Date(t)>now;
     const tv=wAt('temperature_2m',i);
     if(tv!=null){tHi=tHi==null?tv:Math.max(tHi,tv);tLo=tLo==null?tv:Math.min(tLo,tv);}
-    const pr=wAt('precipitation',i);
-    if(pr!=null){rainFcst+=pr; if(future)rainRemain+=pr;}
+    const pr=_rcell(wAt('precipitation',i));
+    rainFcst+=pr; if(future)rainRemain+=pr;
     const wv=wAt('windspeed_10m',i);
     if(wv!=null){windHi=windHi==null?wv:Math.max(windHi,wv);windLo=windLo==null?wv:Math.min(windLo,wv);}
     const cv=wAt('cloudcover',i);
@@ -1320,7 +1323,7 @@ function computeDaySummary(dateStr){
   ref.time.forEach((t,i)=>{
     if(t.slice(0,10)!==dateStr)return;
     const tv=wAt('temperature_2m',i);if(tv!=null){hi=hi==null?tv:Math.max(hi,tv);lo=lo==null?tv:Math.min(lo,tv);}
-    const pr=wAt('precipitation',i);if(pr!=null)rain+=pr;
+    const pr=_rcell(wAt('precipitation',i));if(pr)rain+=pr;
     const wv=wAt('windspeed_10m',i);if(wv!=null){windHi=windHi==null?wv:Math.max(windHi,wv);windLo=windLo==null?wv:Math.min(windLo,wv);}
     const cv=wAt('cloudcover',i);if(cv!=null){cloudHi=cloudHi==null?cv:Math.max(cloudHi,cv);cloudLo=cloudLo==null?cv:Math.min(cloudLo,cv);cloudSum+=cv;cloudN++;}
     const dd=Math.abs(new Date(t).getHours()-12);if(dd<noonDiff){noonDiff=dd;noonIdx=i;}
@@ -1502,20 +1505,19 @@ function _dayHourPoints(dateStr){
   const idxs=[]; ref.time.forEach((t,i)=>{ if(t.slice(0,10)===dateStr) idxs.push(i); });
   if(idxs.length<2)return null;
   const hz=horizonOf(dateStr), now=Date.now();
-  // Observed value for past hours (so the solid part of the line is real obs),
-  // blended forecast otherwise — matching the Observed/Forecast legend.
-  const val=(field,i)=>{
+  const fval=(field,i)=>wBlendAt(field,i,hz);                 // pure forecast (predicted range)
+  const val=(field,i)=>{                                      // observed past, forecast future (plotted)
     const t=ref.time[i];
     if(new Date(t).getTime()<=now && actualData && actualData.hourly && actualData.hourly.time){
       const ai=actualData.hourly.time.indexOf(t);
       if(ai>=0){ const av=actualData.hourly[field]?.[ai]; if(av!=null) return av; }
     }
-    return wBlendAt(field,i,hz);
+    return fval(field,i);
   };
-  const temp=idxs.map(i=>val('temperature_2m',i));
-  const rain=idxs.map(i=>val('precipitation',i));
-  const wind=idxs.map(i=>val('windspeed_10m',i));
-  const cloud=idxs.map(i=>val('cloudcover',i));
+  const temp =idxs.map(i=>val('temperature_2m',i)),  tempF =idxs.map(i=>fval('temperature_2m',i));
+  const rain =idxs.map(i=>_rcell(val('precipitation',i))), rainF=idxs.map(i=>_rcell(fval('precipitation',i)));
+  const wind =idxs.map(i=>val('windspeed_10m',i)),   windF =idxs.map(i=>fval('windspeed_10m',i));
+  const cloud=idxs.map(i=>val('cloudcover',i)),       cloudF=idxs.map(i=>fval('cloudcover',i));
   const times=idxs.map(i=>ref.time[i]);
   let nowFrac=null;
   if(dateStr===localTodayStr()){
@@ -1526,18 +1528,18 @@ function _dayHourPoints(dateStr){
     else{ const a=new Date(times[last]).getTime(), b=new Date(times[last+1]).getTime();
       nowFrac=(last+Math.min(1,Math.max(0,(now-a)/(b-a))))/(times.length-1); }
   }
-  return {temp,rain,wind,cloud,nowFrac,n:idxs.length};
+  return {temp,tempF,rain,rainF,wind,windF,cloud,cloudF,nowFrac,n:idxs.length};
 }
 function _sparkline(vals,o){
   const W=240,H=30,padX=2,padT=5,padB=4,n=vals.length;
-  const valid=vals.filter(v=>v!=null&&!isNaN(v)); if(!valid.length)return '<div class="spark"></div>';
-  let mn=Math.min(...valid),mx=Math.max(...valid);
+  const av=vals.filter(v=>v!=null&&!isNaN(v));
+  const fcv=(o.fc&&o.fc.length?o.fc:vals).filter(v=>v!=null&&!isNaN(v));
+  if(!av.length&&!fcv.length)return '<div class="spark"></div>';
+  // y-scale = predicted (forecast) high/low, extended only if observed values
+  // fall outside the prediction.
+  let mn=Math.min(...fcv,...av), mx=Math.max(...fcv,...av);
   if(o.zeroBase)mn=0;
-  if(o.absMin!=null)mn=o.absMin;
-  if(o.absMax!=null)mx=o.absMax;
-  if(o.floorMax!=null)mx=Math.max(mx,o.floorMax);          // keep tiny values tiny
-  if(o.minRange!=null && (mx-mn)<o.minRange){ const c=(mx+mn)/2; mn=c-o.minRange/2; mx=c+o.minRange/2; if(o.zeroBase&&mn<0){mx-=mn;mn=0;} }
-  if(mn===mx){mn-=1;mx+=1;}
+  if(mn===mx){ if(o.zeroBase)mx=mn+1; else {mn-=1;mx+=1;} }
   const X=i=> padX + (n>1? i*(W-2*padX)/(n-1):0);
   const Y=v=> v==null?null : (H-padB) - (Math.max(mn,Math.min(mx,v))-mn)/(mx-mn)*(H-padT-padB);
   const pts=vals.map((v,i)=> v==null?null:[X(i),Y(v)]);
@@ -1563,12 +1565,12 @@ function nowChartHTML(dateStr){
   const now=isToday?p.nowFrac:null;
   const g=_sgid++;
   const rows=[
-    {ic:MI_TEMP,c:'#86efac',vals:p.temp,ramp:_rampTemp,gid:'sgT'+g,sc:{minRange:6}},
-    {ic:MI_RAIN,c:'#60a5fa',vals:p.rain,ramp:_rampRain,gid:'sgR'+g,sc:{zeroBase:true,floorMax:4}},
-    {ic:MI_WIND,c:'#a3e635',vals:p.wind,ramp:_rampWind,gid:'sgW'+g,sc:{zeroBase:true,floorMax:30}},
-    {ic:MI_CLOUD,c:'#c4b5fd',vals:p.cloud,ramp:_rampCloud,gid:'sgC'+g,sc:{absMin:0,absMax:100}}
+    {ic:MI_TEMP,c:'#86efac',vals:p.temp,fc:p.tempF,ramp:_rampTemp,gid:'sgT'+g},
+    {ic:MI_RAIN,c:'#60a5fa',vals:p.rain,fc:p.rainF,ramp:_rampRain,gid:'sgR'+g,zero:true},
+    {ic:MI_WIND,c:'#a3e635',vals:p.wind,fc:p.windF,ramp:_rampWind,gid:'sgW'+g,zero:true},
+    {ic:MI_CLOUD,c:'#c4b5fd',vals:p.cloud,fc:p.cloudF,ramp:_rampCloud,gid:'sgC'+g}
   ];
-  const body=rows.map(r=>`<div class="nc-row"><span class="nc-ico" style="color:${r.c}">${r.ic}</span><div class="nc-spark">${_sparkline(r.vals,Object.assign({color:r.c,ramp:r.ramp,split,now,gid:r.gid},r.sc))}</div></div>`).join('');
+  const body=rows.map(r=>`<div class="nc-row"><span class="nc-ico" style="color:${r.c}">${r.ic}</span><div class="nc-spark">${_sparkline(r.vals,{color:r.c,ramp:r.ramp,fc:r.fc,zeroBase:r.zero,split,now,gid:r.gid})}</div></div>`).join('');
   const legend=`<div class="nc-legend"><span><i class="ncl-line"></i>Observed</span><span><i class="ncl-dash"></i>Forecast</span></div>`;
   return `<div class="now-chart">${body}${legend}</div>`;
 }
@@ -1579,13 +1581,11 @@ function condCard(o){
   const sub2=isT?(o.feels!=null?`Feels like ${tempDisp(o.feels)}°`:''):'';
   const rainV=isT?o.rain:((o.past&&o.actualRain!=null)?o.actualRain:o.rain), windV=isT?o.wind:o.windPeak, cloudV=o.cloud;
   const side=`<div class="cc-now-side">
-    <div class="cc-now-rain" style="color:#60a5fa">${rainV!=null?rainV.toFixed(1)+' mm':'—'}</div>
+    <div class="cc-now-sub" style="color:#60a5fa"><span class="cns-i">${MI_RAIN}</span>${rainV!=null?rainV.toFixed(1)+' mm':'—'}</div>
     <div class="cc-now-sub" style="color:#a3e635"><span class="cns-i">${MI_WIND}</span>${windV!=null?Math.round(windV)+' km/h':'—'}${o.dir?' '+o.dir:''}</div>
     <div class="cc-now-sub" style="color:#c4b5fd"><span class="cns-i">${MI_CLOUD}</span>${cloudV!=null?Math.round(cloudV)+'%':'—'}</div>
   </div>`;
-  const narr=isT?nowNarrative(o):dayNarrative(o);
   return `<div class="cc-box cc-cond cc-now">
-    ${narr?`<div class="cc-now-syn">${narr}</div>`:''}
     <div class="cc-now-main">
       <div class="cc-icon cc-now-icon">${o.icon}</div>
       <div class="cc-now-temp">${big}${sub2?`<div class="cc-now-feels">${sub2}</div>`:''}</div>
