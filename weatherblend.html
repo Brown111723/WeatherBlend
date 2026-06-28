@@ -98,6 +98,7 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 .cc-now-side{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right;}
 .cc-now-rain{font-size:27px;font-weight:600;letter-spacing:-.5px;line-height:1;}
 .cc-now-sub{font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px;}
+.cc-now-rainfig{font-size:16px;}
 .cns-i{display:inline-flex;}
 .cns-i svg{width:14px;height:14px;}
 .cc-now-stats{display:flex;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--border);}
@@ -112,6 +113,7 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 .nc-legend span{display:flex;align-items:center;gap:5px;}
 .nc-legend i{display:inline-block;width:16px;height:0;border-top:2px solid var(--text-muted);}
 .nc-legend i.ncl-dash{border-top-style:dashed;}
+.nc-legend i.ncl-pred{border-top:1.5px dotted var(--text-muted);opacity:.7;}
 .ccs{flex:1;display:flex;align-items:center;gap:7px;min-width:0;}
 .ccs-i{display:flex;flex-shrink:0;}
 .ccs-i svg{width:17px;height:17px;}
@@ -649,6 +651,7 @@ let verticalLayout = false;
 let showDebug = false;             // debug panel hidden by default
 let showActuals = true;            // show the BOM "Actual" rows/columns
 let learnDays = 35;                // accuracy learning window (days), configurable
+let showPredLine = false;          // overlay forecast curve on past hours in sparklines
 let actualData = null;             // BOM observation actuals for the past days
 let manualLocationOverride = false; // set when user picks a city by hand this session
 let locationOffsetSec = null;      // UTC offset (sec) of the location — aligns BOM forecast times
@@ -703,6 +706,7 @@ function buildSourcesPanel(){
     ti("tog-weighted",e(useWeightedAvg),"⚖️","toggleWeighting(document.getElementById('tog-weighted'))","Weighted")+
     ti("tog-vert",e(verticalLayout),"⇅","toggleVertical(document.getElementById('tog-vert'))","Vertical")+
     ti("tog-actual",e(showActuals),"✓","toggleActuals(document.getElementById('tog-actual'))","Actual")+
+    ti("tog-pred",e(showPredLine),"📈","togglePredLine(document.getElementById('tog-pred'))","Predicted line")+
     ti("tog-debug",e(showDebug),"🐞","toggleDebug(document.getElementById('tog-debug'))","Debug")+
     `</div></div>`+
     `<div class="config-row">`+
@@ -800,6 +804,12 @@ function setLearnDays(v){
 function applyDebugVisibility(){
   const p=document.getElementById('debug-panel');
   if(p)p.style.display=showDebug?'flex':'none';
+}
+function togglePredLine(btn){
+  showPredLine=!showPredLine;
+  if(btn){btn.classList.toggle('enabled',showPredLine);btn.classList.toggle('disabled',!showPredLine);}
+  savePrefs();
+  if(Object.keys(state.data).length)renderCurrentBar();
 }
 function toggleDebug(btn){
   showDebug=!showDebug;
@@ -921,7 +931,7 @@ function loadSavedLocation(){
 function savePrefs(){
   try{
     localStorage.setItem('wb_prefs',JSON.stringify({
-      showDetail,useWeightedAvg,verticalLayout,showDebug,showActuals,learnDays,
+      showDetail,useWeightedAvg,verticalLayout,showDebug,showActuals,learnDays,showPredLine,
       secVisible:{...secVisible},
       secDetail:{...secDetail},
       enabled:[...enabled],
@@ -939,6 +949,7 @@ function loadPrefs(){
     if(p.showDebug!==undefined)showDebug=p.showDebug;
     if(p.showActuals!==undefined)showActuals=p.showActuals;
     if(p.learnDays!==undefined&&p.learnDays>=1&&p.learnDays<=90)learnDays=p.learnDays;
+    if(p.showPredLine!==undefined)showPredLine=p.showPredLine;
     if(p.secVisible)Object.assign(secVisible,p.secVisible);
     if(p.secDetail)Object.assign(secDetail,p.secDetail);
     if(p.enabled){enabled.clear();p.enabled.forEach(k=>{if(MODELS.find(m=>m.key===k))enabled.add(k);});}
@@ -1399,7 +1410,7 @@ function buildDayBoxes(dateStr){
   const arrow=s.windDir!=null?dirArrow16(s.windDir):'', dir=s.windDir!=null?dirFull(s.windDir):'';
   const HL=(hi,lo,u)=>`↑${hi!=null?Math.round(hi)+u:'—'}<span style="display:inline-block;width:10px"></span>↓${lo!=null?Math.round(lo)+u:'—'}`;
   const cond=condCard({today:false, dateStr, icon:wxIcon(s.dayCode,false), condWord:wxDesc(s.dayCode,true),
-    hi:s.hi, lo:s.lo, rain:s.rain, actualRain:s.actualRain, windPeak:s.windHi, dir,
+    hi:s.hi, lo:s.lo, aHi:s.aTHi, aLo:s.aTLo, aHasT:s.aHasT, rain:s.rain, actualRain:s.actualRain, windPeak:s.windHi, dir,
     cloud:s.cloudMean, code:s.dayCode, past});
 
   // TEMP
@@ -1488,7 +1499,7 @@ function dayNarrative(o){
   else if(o.cloud!=null&&o.cloud>30) clause='Partly cloudy';
   else clause='Mostly sunny';
   const rt=o.rain>0.2?`, around ${o.rain.toFixed(1)} mm`:'';
-  return `${clause}${rt}. High ${o.hi!=null?Math.round(o.hi)+'°':'—'}, low ${o.lo!=null?Math.round(o.lo)+'°':'—'}.`;
+  return `${clause}${rt}.`;
 }
 function _stat(icon,big,sub,col){
   return `<div class="ccs"><span class="ccs-i" style="color:${col||'var(--text-dim)'}">${icon}</span><div class="ccs-txt"><b>${big}</b><span>${sub}</span></div></div>`;
@@ -1550,9 +1561,17 @@ function _sparkline(vals,o){
   const firstX=pts.find(p=>p)[0], area=path(pts)+` L ${X(n-1).toFixed(1)} ${H-padB} L ${firstX.toFixed(1)} ${H-padB} Z`;
   const stops=vals.map((v,i)=> v==null?null:`<stop offset="${(n>1?i/(n-1):0)*100}%" stop-color="${o.ramp(v)}" stop-opacity="0.5"/>`).filter(Boolean).join('');
   const nowLine=(o.now!=null)?`<line x1="${(o.now*(W-2*padX)+padX).toFixed(1)}" y1="0" x2="${(o.now*(W-2*padX)+padX).toFixed(1)}" y2="${H}" stroke="#ff4d4f" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`:'';
+  // Optional: the forecast curve over the OBSERVED (past) span, to compare prediction vs actual
+  let predLine='';
+  if(o.showPred && o.fc && o.fc.length===n){
+    const fcPts=o.fc.map((v,i)=> (v==null||X(i)>cut+0.6)?null:[X(i),Y(v)]);
+    const dpred=path(fcPts);
+    if(dpred) predLine=`<path d="${dpred}" fill="none" stroke="${o.color}" stroke-width="1.1" stroke-dasharray="1.5 2.5" opacity="0.55" vector-effect="non-scaling-stroke"/>`;
+  }
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" height="${H}">
     <defs><linearGradient id="${o.gid}" x1="0" y1="0" x2="1" y2="0">${stops}</linearGradient></defs>
     <path d="${area}" fill="url(#${o.gid})"/>
+    ${predLine}
     ${path(solid)?`<path d="${path(solid)}" fill="none" stroke="${o.color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`:''}
     ${dash&&path(dash)?`<path d="${path(dash)}" fill="none" stroke="${o.color}" stroke-width="1.6" stroke-dasharray="3 3" stroke-linejoin="round" stroke-linecap="round" opacity="0.85" vector-effect="non-scaling-stroke"/>`:''}
     ${nowLine}
@@ -1565,30 +1584,41 @@ function nowChartHTML(dateStr){
   const now=isToday?p.nowFrac:null;
   const g=_sgid++;
   const rows=[
-    {ic:MI_TEMP,c:'#86efac',vals:p.temp,fc:p.tempF,ramp:_rampTemp,gid:'sgT'+g},
-    {ic:MI_RAIN,c:'#60a5fa',vals:p.rain,fc:p.rainF,ramp:_rampRain,gid:'sgR'+g,zero:true},
-    {ic:MI_WIND,c:'#a3e635',vals:p.wind,fc:p.windF,ramp:_rampWind,gid:'sgW'+g,zero:true},
-    {ic:MI_CLOUD,c:'#c4b5fd',vals:p.cloud,fc:p.cloudF,ramp:_rampCloud,gid:'sgC'+g}
-  ];
-  const body=rows.map(r=>`<div class="nc-row"><span class="nc-ico" style="color:${r.c}">${r.ic}</span><div class="nc-spark">${_sparkline(r.vals,{color:r.c,ramp:r.ramp,fc:r.fc,zeroBase:r.zero,split,now,gid:r.gid})}</div></div>`).join('');
-  const legend=`<div class="nc-legend"><span><i class="ncl-line"></i>Observed</span><span><i class="ncl-dash"></i>Forecast</span></div>`;
+    {k:'temp', ic:MI_TEMP,c:'#86efac',vals:p.temp,fc:p.tempF,ramp:_rampTemp,gid:'sgT'+g},
+    {k:'rain', ic:MI_RAIN,c:'#60a5fa',vals:p.rain,fc:p.rainF,ramp:_rampRain,gid:'sgR'+g,zero:true},
+    {k:'wind', ic:MI_WIND,c:'#a3e635',vals:p.wind,fc:p.windF,ramp:_rampWind,gid:'sgW'+g,zero:true},
+    {k:'cloud',ic:MI_CLOUD,c:'#c4b5fd',vals:p.cloud,fc:p.cloudF,ramp:_rampCloud,gid:'sgC'+g}
+  ].filter(r=>secVisible[r.k]);
+  if(!rows.length)return '';
+  const body=rows.map(r=>`<div class="nc-row"><span class="nc-ico" style="color:${r.c}">${r.ic}</span><div class="nc-spark">${_sparkline(r.vals,{color:r.c,ramp:r.ramp,fc:r.fc,zeroBase:r.zero,split,now,gid:r.gid,showPred:showPredLine})}</div></div>`).join('');
+  const legend=`<div class="nc-legend"><span><i class="ncl-line"></i>Observed</span><span><i class="ncl-dash"></i>Forecast</span>${showPredLine?`<span><i class="ncl-pred"></i>Predicted</span>`:''}</div>`;
   return `<div class="now-chart">${body}${legend}</div>`;
 }
 function condCard(o){
-  const isT=o.today;
-  const tempVal=isT?o.temp:o.hi;
-  const big=`<div class="cc-now-big" style="color:${tempColor(tempVal)}">${tempVal!=null?(isT?tempDisp(tempVal):Math.round(tempVal))+'°':'—'}${(!isT&&o.lo!=null)?`<span class="cc-now-lo">${Math.round(o.lo)}°</span>`:''}</div>`;
-  const sub2=isT?(o.feels!=null?`Feels like ${tempDisp(o.feels)}°`:''):'';
-  const rainV=isT?o.rain:((o.past&&o.actualRain!=null)?o.actualRain:o.rain), windV=isT?o.wind:o.windPeak, cloudV=o.cloud;
-  const side=`<div class="cc-now-side">
-    <div class="cc-now-sub" style="color:#60a5fa"><span class="cns-i">${MI_RAIN}</span>${rainV!=null?rainV.toFixed(1)+' mm':'—'}</div>
-    <div class="cc-now-sub" style="color:#a3e635"><span class="cns-i">${MI_WIND}</span>${windV!=null?Math.round(windV)+' km/h':'—'}${o.dir?' '+o.dir:''}</div>
-    <div class="cc-now-sub" style="color:#c4b5fd"><span class="cns-i">${MI_CLOUD}</span>${cloudV!=null?Math.round(cloudV)+'%':'—'}</div>
-  </div>`;
+  const isT=o.today, past=!isT&&o.past, future=!isT&&!o.past;
+  let big='', sub2='';
+  if(isT){
+    big=`<div class="cc-now-big" style="color:${tempColor(o.temp)}">${o.temp!=null?tempDisp(o.temp)+'°':'—'}</div>`;
+    sub2=o.feels!=null?`Feels like ${tempDisp(o.feels)}°`:'';
+  }else{
+    const useAct=past&&o.aHasT;
+    const hi=useAct?o.aHi:o.hi, lo=useAct?o.aLo:o.lo;
+    big=`<div class="cc-now-big" style="color:${tempColor(hi)}">${hi!=null?Math.round(hi)+'°':'—'}${lo!=null?`<span class="cc-now-lo">${Math.round(lo)}°</span>`:''}</div>`;
+    if(useAct) sub2=`Forecast ${o.hi!=null?Math.round(o.hi)+'°':'—'} / ${o.lo!=null?Math.round(o.lo)+'°':'—'}`;
+  }
+  const rainV=isT?o.rain:((past&&o.actualRain!=null)?o.actualRain:o.rain), windV=isT?o.wind:o.windPeak, cloudV=o.cloud;
+  const sideRows=[];
+  if(secVisible.rain) sideRows.push(`<div class="cc-now-sub cc-now-rainfig" style="color:#60a5fa"><span class="cns-i">${MI_RAIN}</span>${rainV!=null?rainV.toFixed(1)+' mm':'—'}</div>`);
+  if(secVisible.wind) sideRows.push(`<div class="cc-now-sub" style="color:#a3e635"><span class="cns-i">${MI_WIND}</span>${windV!=null?Math.round(windV)+' km/h':'—'}${o.dir?' '+o.dir:''}</div>`);
+  if(secVisible.cloud) sideRows.push(`<div class="cc-now-sub" style="color:#c4b5fd"><span class="cns-i">${MI_CLOUD}</span>${cloudV!=null?Math.round(cloudV)+'%':'—'}</div>`);
+  const side=sideRows.length?`<div class="cc-now-side">${sideRows.join('')}</div>`:'';
+  const synop=future?`<div class="cc-now-syn">${dayNarrative(o)}</div>`:'';
+  const tempBlock=secVisible.temp?`<div class="cc-now-temp">${big}${sub2?`<div class="cc-now-feels">${sub2}</div>`:''}</div>`:'';
   return `<div class="cc-box cc-cond cc-now">
+    ${synop}
     <div class="cc-now-main">
       <div class="cc-icon cc-now-icon">${o.icon}</div>
-      <div class="cc-now-temp">${big}${sub2?`<div class="cc-now-feels">${sub2}</div>`:''}</div>
+      ${tempBlock}
       ${side}
     </div>
     ${o.dateStr?nowChartHTML(o.dateStr):''}
@@ -3286,6 +3316,7 @@ function renderHourly(){
   }
   const actualTempCells=buildActualCells('temperature_2m',indices,v=>tempDisp(v)+'°',tempCls,nowCi);
   const actualRainCells=buildActualCells('precipitation',indices,v=>v<0.05?'<span class="empty">0</span>':v.toFixed(1),rainCls,nowCi);
+  const actualWindCells=buildActualCells('windspeed_10m',indices,v=>Math.round(v)+'',windCls,nowCi);
 
   document.querySelector('.ftable').innerHTML=`
     <tbody>
@@ -3310,6 +3341,7 @@ function renderHourly(){
       <tr class="sec-head-wind">${secHeadLabel('wind','Wind')}${avgWindCells}</tr>
       <tr class="data-row src-row src-wind${secDetail.wind?'':' src-hidden'}"><td class="row-label" style="font-size:13px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
       ${windModelRows}
+      ${actualData&&showActuals?`<tr class="actual-row"><td class="row-label" style="color:#d9f99d">✓ Actual</td>${actualWindCells}</tr>`:''}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup("cloud",buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,ref,actMap))}`;
