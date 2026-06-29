@@ -87,7 +87,7 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 #curr-bar.loaded::-webkit-scrollbar{display:none;}
 .cc-page{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always;padding:14px 16px;box-sizing:border-box;}
 .cc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:stretch;}
-.cc-box{background:rgba(255,255,255,0.032);border:1px solid var(--border);border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden;}
+.cc-box{background:rgba(18,26,40,0.46);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
 /* NOW / conditions headline card (spans full width) */
 .cc-box.cc-cond{grid-column:1 / -1;gap:0;padding:14px 16px;background:rgba(18,26,40,0.46);border-color:rgba(255,255,255,.09);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
 .cc-now-syn{font-size:14px;line-height:1.4;color:var(--text-muted);font-weight:500;margin-bottom:11px;}
@@ -111,8 +111,7 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 .nc-scrubbable{touch-action:pan-y;cursor:ew-resize;}
 .nc-cursor{position:absolute;top:-3px;bottom:1px;width:0;border-left:1.5px solid #ff4d4f;pointer-events:none;z-index:4;transition:left .12s ease;}
 .nc-rows.scrubbing .nc-cursor{transition:none;}
-.nc-cursor-time{position:absolute;bottom:-13px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:800;color:#ff4d4f;white-space:nowrap;letter-spacing:.2px;text-shadow:0 0 3px rgba(0,0,0,.7);}
-.nc-axis{display:flex;align-items:center;gap:10px;margin-top:16px;}
+.nc-axis{display:flex;align-items:center;gap:10px;margin-top:6px;}
 .nc-axis .nc-ico,.nc-axis .nc-hl{height:auto;min-height:0;}
 .nc-axis-track{flex:1;min-width:0;position:relative;height:12px;}
 .nc-sun{position:absolute;top:0;display:flex;align-items:center;gap:3px;font-size:9.5px;font-weight:600;color:#e7a755;white-space:nowrap;}
@@ -422,6 +421,11 @@ body{padding-bottom:64px;}
 .past-col{}/* past dimming now done by overlay */
 .actual-row td{text-align:center;padding:5px 3px;font-size:13px;color:var(--text-primary);border-top:1px dashed var(--border2);font-style:italic;}
 .actual-row td.row-label{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;color:var(--text-muted);font-style:normal;}
+.act-src{color:var(--text-dim);font-weight:500;font-size:9.5px;margin-left:5px;text-transform:uppercase;letter-spacing:.4px;}
+.seg{display:flex;border:1px solid var(--border2);border-radius:9px;overflow:hidden;background:rgba(255,255,255,.03);}
+.seg-btn{flex:1;padding:8px 4px;font-size:12px;font-weight:600;color:var(--text-muted);background:transparent;border:none;border-right:1px solid var(--border2);cursor:pointer;}
+.seg-btn:last-child{border-right:none;}
+.seg-btn.on{background:rgba(96,165,250,.20);color:var(--text-primary);}
 .err-banner{margin:10px 20px;padding:12px 16px;background:#2a1010;border:1px solid #5a1a1a;border-radius:8px;color:#f87171;font-size:15px;}
 .source-note{padding:14px 20px;font-size:13px;color:var(--text-dim);}
 .source-note a{color:var(--text-muted);text-decoration:none;}
@@ -673,7 +677,9 @@ let metricWeights = {temp:{},rain:{},wind:{},cloud:{}}; // per-metric key -> wei
 let useWeightedAvg = true;         // toggled by config panel
 let verticalLayout = false;
 let showDebug = false;             // debug panel hidden by default
-let showActuals = true;            // show the BOM "Actual" rows/columns
+let showActuals = true;            // show the "Actual" rows/columns
+let actualSources = null;          // {bom,om,blend} hourly+daily actual series
+let actualSource = 'bom';          // active source: 'bom' | 'om' | 'blend' (drives cards + weights)
 let learnDays = 35;                // accuracy learning window (days), configurable
 let showPredLine = false;          // overlay forecast curve on past hours in sparklines
 let actualData = null;             // BOM observation actuals for the past days
@@ -741,6 +747,14 @@ function buildSourcesPanel(){
     `</select>`+
     `<span class="learn-hint">Days of history used to score model accuracy</span>`+
     `</div></div>`+
+    `<div class="config-row">`+
+    `<div class="config-row-label">Actual source</div>`+
+    `<div class="seg" id="asrc-seg">`+
+    [['bom','BOM'],['om','Open-Meteo'],['blend','Blend']].map(([k,l])=>
+      `<button class="seg-btn${actualSource===k?' on':''}" data-src="${k}" onclick="setActualSource('${k}')">${l}</button>`).join('')+
+    `</div>`+
+    `<span class="learn-hint">Which observations feed the Actual rows &amp; the blend weights</span>`+
+    `</div>`+
     `<div class="config-row">`+
     `<div class="config-row-label">Sources</div>`+
     `<div class="config-icons-row">`+
@@ -815,6 +829,20 @@ function toggleActuals(btn){
   if(btn){btn.classList.toggle('enabled',showActuals);btn.classList.toggle('disabled',!showActuals);}
   savePrefs();
   if(Object.keys(state.data).length){renderTable();}
+}
+// 3-way actual source: BOM / Open-Meteo / Blend. Re-points actualData and
+// recomputes the blend weights against the chosen truth.
+function setActualSource(s){
+  if(s!=='bom'&&s!=='om'&&s!=='blend')return;
+  if(actualSource===s)return;
+  actualSource=s; savePrefs();
+  document.querySelectorAll('#asrc-seg .seg-btn').forEach(b=>b.classList.toggle('on',b.dataset.src===s));
+  if(actualSources){
+    selectActual();
+    computeMetricWeights(selectedTruth());     // selected source now drives the weights
+    applyHistoricalWeights();                   // (no-op unless source is BOM with learned weights)
+    if(Object.keys(state.data).length){ try{buildForecastRainCache();buildHiLoCache();}catch(e){} renderCurrentBar(); renderTable(); }
+  }
 }
 function setLearnDays(v){
   const d=parseInt(v,10); if(isNaN(d))return;
@@ -955,7 +983,7 @@ function loadSavedLocation(){
 function savePrefs(){
   try{
     localStorage.setItem('wb_prefs',JSON.stringify({
-      showDetail,useWeightedAvg,verticalLayout,showDebug,showActuals,learnDays,showPredLine,
+      showDetail,useWeightedAvg,verticalLayout,showDebug,showActuals,actualSource,learnDays,showPredLine,
       secVisible:{...secVisible},
       secDetail:{...secDetail},
       enabled:[...enabled],
@@ -972,6 +1000,7 @@ function loadPrefs(){
     if(p.verticalLayout!==undefined)verticalLayout=p.verticalLayout;
     if(p.showDebug!==undefined)showDebug=p.showDebug;
     if(p.showActuals!==undefined)showActuals=p.showActuals;
+    if(p.actualSource==='bom'||p.actualSource==='om'||p.actualSource==='blend')actualSource=p.actualSource;
     if(p.learnDays!==undefined&&p.learnDays>=1&&p.learnDays<=90)learnDays=p.learnDays;
     if(p.showPredLine!==undefined)showPredLine=p.showPredLine;
     if(p.secVisible)Object.assign(secVisible,p.secVisible);
@@ -1683,8 +1712,7 @@ function nowChartHTML(dateStr){
   const legend=`<div class="nc-legend"><span><i class="ncl-line"></i>Observed</span><span><i class="ncl-dash"></i>Forecast</span>${showPredLine?`<span><i class="ncl-pred"></i>Predicted</span>`:''}</div>`;
   let cursor='';
   if(isToday && now!=null){
-    const cf=_curFrac(now);
-    cursor=`<div class="nc-cursor" style="left:${cf}"><span class="nc-cursor-time">${locNowLabel()}</span></div>`;
+    cursor=`<div class="nc-cursor" style="left:${_curFrac(now)}"></div>`;
   }
   const scrubAttr=isToday?` data-scrub="1" data-date="${dateStr}"`:'';
   return `<div class="now-chart"><div class="nc-rows${isToday?' nc-scrubbable':''}"${scrubAttr}>${body}${cursor}</div>${axis}${legend}</div>`;
@@ -1720,6 +1748,17 @@ function _scrubAt(idx){
   _scrub.cursor.style.left=_curFrac(n>1?idx/(n-1):0);
   _scrub.cursor.classList.add('scrub-on');
   const te=_scrub.cursor.querySelector('.nc-cursor-time'); if(te)te.textContent=d.timeLabel;
+  // dynamic backdrop tracks the hovered hour
+  try{
+    const iso=p.times[idx], tod=sunPhaseAt(iso), night=tod==='night';
+    const c=composeBackdrop({temp:p.temp[idx],cloud:p.cloud[idx],rain:p.rain[idx],tod,night});
+    const bar=document.getElementById('curr-bar');
+    if(bar){
+      bar.style.background=c.bg; bar.style.setProperty('--glass-bg',c.glass);
+      bar.dataset.tod=tod; bar.dataset.night=night?'1':'0'; bar.dataset.scene=sceneFromCode(p.codes[idx]);
+      bar.style.setProperty('--rain-op',(p.rain[idx]>0.05?Math.min(0.22,0.08+p.rain[idx]*0.03):0).toFixed(3));
+    }
+  }catch(e){}
 }
 function _scrubMove(e){
   if(!_scrub)return;
@@ -1740,6 +1779,7 @@ function _scrubEnd(){
     _scrub.cursor.classList.remove('scrub-on');
     const te=_scrub.cursor.querySelector('.nc-cursor-time'); if(te)te.textContent=locNowLabel();
     _scrub.rows.classList.remove('scrubbing');
+    try{applyBackdrop();}catch(e){}                               // restore live backdrop
   }
   document.removeEventListener('pointermove',_scrubMove);
   document.removeEventListener('pointerup',_scrubEnd);
@@ -2552,12 +2592,11 @@ async function fetchActualsAndComputeWeights(){
     // 2) Build the DISPLAY actuals: BOM where present, else Open-Meteo blended
     //    past data as a fallback so the Actual rows aren't empty.
     actualData=buildActualData(bom);
-    if(bom) dbg('actuals: BOM '+(bom.stationName||'')+' + Open-Meteo fill');
-    else dbg('actuals: Open-Meteo past (no BOM)');
+    if(bom) dbg('actuals: BOM '+(bom.stationName||'')+' + Open-Meteo · source='+actualSource);
+    else dbg('actuals: Open-Meteo past (no BOM) · source='+actualSource);
 
-    // 3) Per-metric weights, scored only against REAL BOM hours (avoids the
-    //    circularity of scoring models against a model-based fallback).
-    computeMetricWeights(bom);
+    // 3) Per-metric weights, scored against the SELECTED actual source.
+    computeMetricWeights(selectedTruth());
   }catch(e){
     console.warn('Actuals/weights failed:',e.message);
     actualData=null;
@@ -2653,6 +2692,7 @@ async function syncAndLoadAccuracy(){
 // Replace the live BOM-scored weights with the learned historical ones
 function applyHistoricalWeights(){
   if(!historicalWeights)return;
+  if(actualSource!=='bom')return;   // OM/Blend keep their client-scored weights
   const am=activeEnabled();
   const normInto=(target,src)=>{
     ['temp','rain','wind','cloud'].forEach(s=>{
@@ -2731,58 +2771,83 @@ function meanAt(field,idx){
   return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;
 }
 
-// Build display actuals over past hours: BOM value if present, else OM blend.
-function buildActualData(bom){
-  const ref=refHourly();
-  if(!ref?.time) return bom;            // nothing to align to → just use BOM
-  const now=Date.now();
-  const bomMap={};
-  if(bom?.hourly?.time) bom.hourly.time.forEach((t,i)=>{bomMap[t]=i;});
-  const H={time:[],temperature_2m:[],precipitation:[],cloudcover:[],windspeed_10m:[]};
-  ref.time.forEach((t,i)=>{
-    if(new Date(t).getTime()>now) return;     // only past/now
-    const bi=bomMap[t];
-    const pick=(field,omField)=>{
-      if(bi!==undefined){const v=bom.hourly[field]?.[bi];if(v!=null&&!isNaN(v))return v;}
-      return meanAt(omField,i);
-    };
-    H.time.push(t);
-    H.temperature_2m.push(pick('temperature_2m','temperature_2m'));
-    H.precipitation.push(pick('precipitation','precipitation'));
-    H.cloudcover.push(pick('cloudcover','cloudcover'));
-    H.windspeed_10m.push(pick('windspeed_10m','windspeed_10m'));
-  });
-  // Aggregate the hourly actuals into per-day actuals (for the daily table)
+// Build display actuals over past hours as THREE series:
+//  • bom   — BOM observation where present, else Open-Meteo blended fallback
+//  • om    — Open-Meteo blended (model mean) for every past hour
+//  • blend — average of the BOM-infused value and the Open-Meteo value
+function _dailyFromHourly(H){
   const byDay={};
   H.time.forEach((t,i)=>{
     const d=t.slice(0,10);
-    const o=byDay[d]||(byDay[d]={tmax:null,tmin:null,psum:0,cmax:null,cmin:null,wmax:null,hasP:false});
+    const o=byDay[d]||(byDay[d]={tmax:null,tmin:null,psum:0,cmax:null,cmin:null,wmax:null,wmin:null,hasP:false});
     const tv=H.temperature_2m[i];if(tv!=null){o.tmax=o.tmax==null?tv:Math.max(o.tmax,tv);o.tmin=o.tmin==null?tv:Math.min(o.tmin,tv);}
     const pv=H.precipitation[i];if(pv!=null){o.psum+=pv;o.hasP=true;}
     const cv=H.cloudcover[i];if(cv!=null){o.cmax=o.cmax==null?cv:Math.max(o.cmax,cv);o.cmin=o.cmin==null?cv:Math.min(o.cmin,cv);}
-    const wv=H.windspeed_10m[i];if(wv!=null){o.wmax=o.wmax==null?wv:Math.max(o.wmax,wv);}
+    const wv=H.windspeed_10m[i];if(wv!=null){o.wmax=o.wmax==null?wv:Math.max(o.wmax,wv);o.wmin=o.wmin==null?wv:Math.min(o.wmin,wv);}
   });
-  const D={time:[],temperature_2m_max:[],temperature_2m_min:[],precipitation_sum:[],cloudcover_max:[],cloudcover_min:[],windspeed_10m_max:[]};
-  Object.keys(byDay).sort().forEach(d=>{const o=byDay[d];D.time.push(d);D.temperature_2m_max.push(o.tmax);D.temperature_2m_min.push(o.tmin);D.precipitation_sum.push(o.hasP?o.psum:null);D.cloudcover_max.push(o.cmax);D.cloudcover_min.push(o.cmin);D.windspeed_10m_max.push(o.wmax);});
-
-  return { stationName: bom?.stationName || 'Open-Meteo (est.)', hourly:H, daily:D, _bom: bom };
+  const D={time:[],temperature_2m_max:[],temperature_2m_min:[],precipitation_sum:[],cloudcover_max:[],cloudcover_min:[],windspeed_10m_max:[],windspeed_10m_min:[]};
+  Object.keys(byDay).sort().forEach(d=>{const o=byDay[d];D.time.push(d);D.temperature_2m_max.push(o.tmax);D.temperature_2m_min.push(o.tmin);D.precipitation_sum.push(o.hasP?o.psum:null);D.cloudcover_max.push(o.cmax);D.cloudcover_min.push(o.cmin);D.windspeed_10m_max.push(o.wmax);D.windspeed_10m_min.push(o.wmin);});
+  return D;
+}
+function buildActualData(bom){
+  const ref=refHourly();
+  if(!ref?.time){ actualSources=null; return bom; }
+  const now=Date.now();
+  const bomMap={};
+  if(bom?.hourly?.time) bom.hourly.time.forEach((t,i)=>{bomMap[t]=i;});
+  const mk=()=>({time:[],temperature_2m:[],precipitation:[],cloudcover:[],windspeed_10m:[]});
+  const B=mk(), O=mk(), L=mk();
+  const FS=['temperature_2m','precipitation','cloudcover','windspeed_10m'];
+  ref.time.forEach((t,i)=>{
+    if(new Date(t).getTime()>now) return;     // only past/now
+    const bi=bomMap[t];
+    B.time.push(t);O.time.push(t);L.time.push(t);
+    FS.forEach(f=>{
+      let bomV=(bi!==undefined)?bom.hourly[f]?.[bi]:null; if(bomV==null||isNaN(bomV))bomV=null;
+      let omV=meanAt(f,i); if(omV==null||isNaN(omV))omV=null;
+      const bInf=(bomV!=null)?bomV:omV;                                  // BOM-infused
+      const bl=(bomV!=null&&omV!=null)?(bomV+omV)/2:(bInf!=null?bInf:omV); // average where both real
+      B[f].push(bInf); O[f].push(omV); L[f].push(bl);
+    });
+  });
+  actualSources={
+    bom:{hourly:B,daily:_dailyFromHourly(B)},
+    om:{hourly:O,daily:_dailyFromHourly(O)},
+    blend:{hourly:L,daily:_dailyFromHourly(L)},
+    _bom:bom, stationName: bom?.stationName || 'Open-Meteo (est.)'
+  };
+  return selectActual();
+}
+// Point `actualData` at the chosen source (used by cards, sparklines, tiles, table).
+function selectActual(){
+  if(!actualSources){actualData=null;return null;}
+  const src=actualSources[actualSource]||actualSources.bom;
+  actualData={hourly:src.hourly, daily:src.daily, _bom:actualSources._bom, stationName:actualSources.stationName, source:actualSource};
+  return actualData;
+}
+// Truth series fed to the weight calculation, per the selected source.
+function selectedTruth(){
+  if(!actualSources)return null;
+  if(actualSource==='om')   return actualSources.om.hourly;
+  if(actualSource==='blend')return actualSources.blend.hourly;
+  return actualSources._bom?.hourly||null;     // pure BOM observations
 }
 
-// Per-metric recency-weighted inverse-RMSE weights, scored vs real BOM only.
-function computeMetricWeights(bom){
+// Per-metric recency-weighted inverse-RMSE weights, scored vs the chosen actual source.
+function computeMetricWeights(truth){
   const am=activeEnabled();
   metricWeights={temp:{},rain:{},wind:{},cloud:{}};
   modelWeights={};
   const METS=[['temp','temperature_2m'],['rain','precipitation'],['wind','windspeed_10m'],['cloud','cloudcover']];
 
-  const haveBom = bom?.hourly?.time?.length>0;
+  const haveTruth = truth?.time?.length>0;
   if(!am.length){return;}
-  if(!haveBom){ // no real obs → equal weights everywhere
+  if(!haveTruth){ // no observations → equal weights everywhere
     am.forEach(m=>{METS.forEach(([s])=>metricWeights[s][m.key]=1/am.length);modelWeights[m.key]=1/am.length;});
     return;
   }
 
-  const bMap={}; bom.hourly.time.forEach((t,i)=>{bMap[t]=i;});
+  const bMap={}; truth.time.forEach((t,i)=>{bMap[t]=i;});
   const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-1); cutoff.setHours(23,0,0,0); // 11pm last night
   const DECAY=Math.log(2)/48;
 
@@ -2795,7 +2860,7 @@ function computeMetricWeights(bom){
       const rowMs=new Date(t).getTime(); if(rowMs>cutoff.getTime())return;
       const rw=Math.exp(-DECAY*Math.max(0,(cutoff.getTime()-rowMs)/3600000));
       METS.forEach(([s,field])=>{
-        const mv=mh[field]?.[i], av=bom.hourly[field]?.[bi];
+        const mv=mh[field]?.[i], av=truth[field]?.[bi];
         if(mv==null||av==null||isNaN(mv)||isNaN(av))return;
         err[m.key][s].se+=rw*(mv-av)**2;
         err[m.key][s].wn+=rw;
@@ -2925,18 +2990,23 @@ function buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,r
   const avg=indices.map(i=>wBlendAt('cloudcover',i,horizonOf(ref.time[i].slice(0,10))));
   const avgCells=avg.map((v,ci)=>{const cls=cloudCls(v);const nc=ci===nowCi?"now-col":"";const txt=v!=null?Math.round(v)+"%":"—";return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${txt}</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());}).join("");
   const srcRows=allActive.map(m=>{const v=hVals(m.key,"cloudcover",indices);const cells=v.map((x,ci)=>{const cls=cloudCls(x);const nc=ci===nowCi?"now-col":"";return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${x!=null?Math.round(x)+"%":"—"}</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());}).join("");return`<tr class="${srcRowClass(m,'cloud')}"><td class="row-label"><span class="model-badge"><span class="mdot" style="background:${m.color}">${m.short}</span>${wBadge('cloud',m.key)}</span></td>${cells}</tr>`;}).join("");
-  const nowMs=Date.now();
-  const actCells=(actualData&&showActuals)?indices.map((hourIdx,ci)=>{
-    if(new Date(ref.time[hourIdx]).getTime()>=nowMs)return'<td class="empty">–</td>';
-    const ai=actMap[ref.time[hourIdx]];
-    if(ai===undefined)return'<td class="empty">–</td>';
-    const v=actualData.hourly.cloudcover?.[ai];
-    if(v==null)return'<td class="empty">–</td>';
-    const cls=cloudCls(v);const nc=ci===nowCi?"now-col":"";
-    return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${Math.round(v)}%</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());
-  }).join(""):null;
-  return`<tr class="sec-head-temp">${secHeadLabel('cloud','<span style="color:#c4b5fd">Cloud</span>')}${avgCells}</tr>${srcRows}`+
-    (actCells?`<tr class="actual-row"><td class="row-label" style="color:#c4b5fd">✓ Actual</td>${actCells}</tr>`:"");
+  const nowMs=locNowMs();
+  let actRow='';
+  if(actualData&&showActuals){
+    const sh=actualData.hourly, map={}; (sh.time||[]).forEach((t,ai)=>{map[t]=ai;});
+    const cells=indices.map((hourIdx,ci)=>{
+      if(new Date(ref.time[hourIdx]).getTime()>=nowMs)return'<td class="empty">–</td>';
+      const ai=map[ref.time[hourIdx]];
+      if(ai===undefined)return'<td class="empty">–</td>';
+      const v=sh.cloudcover?.[ai];
+      if(v==null)return'<td class="empty">–</td>';
+      const cls=cloudCls(v);const nc=ci===nowCi?"now-col":"";
+      return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(" ")}">${Math.round(v)}%</td>`,(ndCls[ci]+" "+pastCls[ci]).trim());
+    }).join("");
+    const tag=({bom:'BOM',om:'Open-Meteo',blend:'Blend'})[actualSource]||'';
+    actRow=`<tr class="actual-row"><td class="row-label" style="color:#c4b5fd">✓ Actual<span class="act-src">${tag}</span></td>${cells}</tr>`;
+  }
+  return`<tr class="sec-head-temp">${secHeadLabel('cloud','<span style="color:#c4b5fd">Cloud</span>')}${avgCells}</tr>${srcRows}`+actRow;
 }
 function tempCls(v){if(v==null)return'';if(v<5)return'tc';if(v<12)return'tk';if(v<22)return'tm';if(v<30)return'tw';return'th';}
 // ── SVG weather icons (day/night aware), composed from reusable parts ──
@@ -3516,15 +3586,14 @@ function renderHourly(){
   }).join('');
 
   // ── Actual (ERA5) data rows ──
-  function buildActualCells(field, indices, fmtFn, clsFn, nowCiRef){
-    if(!actualData)return indices.map(()=>'<td class="empty">–</td>').join('');
-    const actTimes=actualData.hourly.time;
-    const actVals=actualData.hourly[field]||[];
+  function buildActualCells(seriesH, field, indices, fmtFn, clsFn, nowCiRef){
+    if(!seriesH)return indices.map(()=>'<td class="empty">–</td>').join('');
+    const actTimes=seriesH.time||[];
+    const actVals=seriesH[field]||[];
     const actMap={};actTimes.forEach((t,ai)=>{actMap[t]=ai;});
-    const nowMs=Date.now();
+    const nowMs=locNowMs();
     return indices.map((hourIdx,ci)=>{
       const t=ref.time[hourIdx];
-      // Never show actuals for future timestamps
       if(new Date(t).getTime()>=nowMs)return '<td class="empty">–</td>';
       const ai=actMap[t];
       if(ai===undefined)return '<td class="empty">–</td>';
@@ -3534,10 +3603,13 @@ function renderHourly(){
       return injectColCls(`<td class="${[cls,nc].filter(Boolean).join(' ')}">${fmtFn(v)}</td>`,ndCls[ci]);
     }).join('');
   }
-  const actualTempCells=buildActualCells('temperature_2m',indices,v=>tempDisp(v)+'°',tempCls,nowCi);
-  const actualRainCells=buildActualCells('precipitation',indices,v=>v<0.05?'<span class="empty">0</span>':v.toFixed(1),rainCls,nowCi);
-  const actualWindCells=buildActualCells('windspeed_10m',indices,v=>Math.round(v)+'',windCls,nowCi);
-
+  // One actuals row per metric; its DATA is the selected source (BOM/OM/Blend).
+  const _srcTag=({bom:'BOM',om:'Open-Meteo',blend:'Blend'})[actualSource]||'';
+  function actualRow1(field, fmtFn, clsFn, color){
+    if(!actualData||!showActuals)return '';
+    const cells=buildActualCells(actualData.hourly,field,indices,fmtFn,clsFn,nowCi);
+    return `<tr class="actual-row"><td class="row-label" style="color:${color}">✓ Actual<span class="act-src">${_srcTag}</span></td>${cells}</tr>`;
+  }
   document.querySelector('.ftable').innerHTML=`
     <tbody>
       <tr class="hour-header"><th class="row-label corner-cell"></th>${hdrCells}</tr>
@@ -3548,20 +3620,20 @@ function renderHourly(){
     ${secGroup('temp',`
       <tr class="sec-head-temp">${secHeadLabel('temp','Temp')}${avgTempCells}</tr>
       ${tempModelRows}
-      ${actualData&&showActuals?`<tr class="actual-row"><td class="row-label" style="color:#86efac">✓ Actual</td>${actualTempCells}</tr>`:''}
+      ${actualRow1('temperature_2m',v=>tempDisp(v)+'°',tempCls,'#86efac')}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('rain',`
       <tr class="sec-head-rain">${secHeadLabel('rain','Rain')}${avgRainCells}</tr>
       ${rainModelRows}
-      ${actualData&&showActuals?`<tr class="actual-row"><td class="row-label" style="color:#90caf9">✓ Actual</td>${actualRainCells}</tr>`:''}
+      ${actualRow1('precipitation',v=>v<0.05?'<span class="empty">0</span>':v.toFixed(1),rainCls,'#90caf9')}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup('wind',`
       <tr class="sec-head-wind">${secHeadLabel('wind','Wind')}${avgWindCells}</tr>
       <tr class="data-row src-row src-wind${secDetail.wind?'':' src-hidden'}"><td class="row-label" style="font-size:13px;color:var(--text-dim)">Direction</td>${avgDirCells}</tr>
       ${windModelRows}
-      ${actualData&&showActuals?`<tr class="actual-row"><td class="row-label" style="color:#d9f99d">✓ Actual</td>${actualWindCells}</tr>`:''}
+      ${actualRow1('windspeed_10m',v=>Math.round(v)+'',windCls,'#d9f99d')}
       <tr class="spacer"><td colspan="${C}"></td></tr>
     `)}
     ${secGroup("cloud",buildCloudSection(indices,ndCls,pastCls,nowCi,C,allActive,onlyEnabled,ref,actMap))}`;
