@@ -108,20 +108,16 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 .cc-box{position:relative;}
 .cc-conf-badge{position:absolute;top:8px;right:11px;font-size:11px;font-weight:700;letter-spacing:.2px;opacity:.95;}
 .cc-now-confsub{font-size:11px;font-weight:600;margin-top:1px;opacity:.92;}
-.hb-conf{display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:600;margin-top:3px;opacity:.9;}
-.hb-conf-dot{width:5px;height:5px;border-radius:50%;display:inline-block;}
-.cc-blend-glyph{width:60px;height:60px;display:block;filter:drop-shadow(0 3px 9px rgba(0,0,0,.45));}
-.wb-glyph{width:100%;height:100%;display:block;overflow:visible;}
-.wbg-sun{transform-box:fill-box;transform-origin:center;animation:wbSun 4.6s ease-in-out infinite;}
-.wbg-core{transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 5px rgba(255,255,255,.5));animation:wbCore 3.6s ease-in-out infinite;}
-.wbg-drop{transform-box:fill-box;animation:wbDrop 1.7s ease-in-out infinite;}
-.wbg-drop2{animation-delay:.8s;}
-.wbg-wind path{transform-box:fill-box;animation:wbWind 3.2s ease-in-out infinite;}
-@keyframes wbSun{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
-@keyframes wbCore{0%,100%{opacity:.82;}50%{opacity:1;}}
-@keyframes wbDrop{0%{transform:translateY(-2px);}50%{transform:translateY(3px);}100%{transform:translateY(-2px);}}
-@keyframes wbWind{0%,100%{transform:translateX(-2px);}50%{transform:translateX(3px);}}
-@media(prefers-reduced-motion:reduce){.wbg-sun,.wbg-core,.wbg-drop,.wbg-wind path{animation:none;}}
+.cc-orb-glyph{width:62px;height:62px;display:block;isolation:isolate;filter:drop-shadow(0 2px 7px rgba(0,0,0,.4));}
+.wb-orb{width:100%;height:100%;display:block;overflow:visible;}
+.wb-orb .wbo{mix-blend-mode:screen;}
+.wb-orb circle{transform-box:fill-box;transform-origin:center;animation:wbOrb 4.4s ease-in-out infinite;}
+.wb-orb .wbo-t{animation-delay:0s;}
+.wb-orb .wbo-r{animation-delay:.55s;}
+.wb-orb .wbo-c{animation-delay:1.1s;}
+.wb-orb .wbo-w{animation-delay:1.65s;}
+@keyframes wbOrb{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}
+@media(prefers-reduced-motion:reduce){.wb-orb circle{animation:none;}}
 .cns-i{display:inline-flex;}
 .cns-i svg{width:14px;height:14px;}
 .cc-now-stats{display:flex;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--border);}
@@ -198,20 +194,22 @@ header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;alig
 .tf-select{font-size:12px;font-weight:600;padding:4px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-primary);cursor:pointer;}
 #hour-bar{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding:10px 16px 14px;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
 #hour-bar::-webkit-scrollbar{display:none;}
-.hb-tile{flex:0 0 auto;width:78px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.022);}
+.hb-tile{flex:0 0 auto;width:98px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.022);}
 .hb-tile.hb-past{opacity:.72;}
 .hb-tile.hb-now{border-color:var(--accent);background:rgba(96,165,250,.12);}
 .hb-hour{font-size:12px;font-weight:700;color:var(--text-primary);}
 .hb-wx{width:28px;height:28px;}
 .hb-wx .wxi{width:28px;height:28px;}
 .hb-rows{display:flex;flex-direction:column;gap:3px;align-self:stretch;padding-left:4px;}
-.hb-m{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;line-height:1.1;}
+.hb-m{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;line-height:1.1;white-space:nowrap;}
 .hb-m svg{flex-shrink:0;}
 .hb-t{color:#86efac;}
 .hb-r{color:#90caf9;}
 .hb-w{color:#d9f99d;}
 .hb-c{color:#c4b5fd;}
 .hb-m span{color:var(--text-primary);font-weight:600;}
+.hb-mc{color:inherit!important;opacity:.55;font-weight:600;font-size:10.5px;margin-left:auto;padding-left:5px;}
+.cc-mc{font-size:13px;font-weight:700;opacity:.62;margin-left:6px;letter-spacing:0;vertical-align:baseline;}
 .hb-tile.hb-act .hb-hour::after{content:"•";color:var(--accent);margin-left:3px;}
 /* Fill mode: few tiles stretch to fill the row instead of scrolling */
 #hour-bar.hb-fill{overflow-x:hidden;}
@@ -466,7 +464,7 @@ body{padding-bottom:64px;}
   <button class="hdr-btn ham-btn" onclick="toggleDrawer()" aria-label="Menu" title="Menu">
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
-  <span class="hdr-logo" aria-hidden="true"><svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg"><circle cx="64" cy="30" r="16" fill="#7EE8A5"/><path d="M22 64 C40 64 40 48 58 48" stroke="#A8E63E" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M90 44 C96 52 96 60 90 68 C84 60 84 52 90 44Z" fill="#5FA4FF"/><path d="M38 82 C38 72 46 66 55 66 C58 58 66 55 73 60 C82 60 90 67 90 76 C90 84 84 90 76 90 H48 C42 90 38 86 38 82Z" fill="#C8A6FF"/><circle cx="64" cy="64" r="10" fill="white" opacity="0.95"/></svg></span>
+  <span class="hdr-logo" aria-hidden="true"><svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="32" r="12" fill="#A8E63E"/><circle cx="32" cy="20" r="12" fill="#7EE8A5"/><circle cx="44" cy="32" r="12" fill="#5FA4FF"/><circle cx="32" cy="44" r="12" fill="#C8A6FF"/></svg></span>
   <div class="logo">Weather<span>Blend</span></div>
   <div class="hdr-loc" onclick="promptLocation()" role="button" tabindex="0" title="Change location">
     <div class="loc-name" id="loc-name">Detecting…</div>
@@ -592,7 +590,7 @@ body{padding-bottom:64px;}
       <div class="swatch"><span class="sw" style="background:#4a1a0a"></span> Storm 55+</div>
     </div>
 
-    <h3>Weather sources (8 models)</h3>
+    <h3>Weather sources (7 models)</h3>
     <div class="src-grid"><div class="src-item"><div class="src-name" style="color:#2563eb">GFS</div><div class="src-desc">NOAA · USA · Global 25km · 16-day</div></div>
       <div class="src-item"><div class="src-name" style="color:#059669">ECMWF</div><div class="src-desc">European Centre · 9km · Open data since Oct 2025</div></div>
       <div class="src-item"><div class="src-name" style="color:#16a34a">ICON</div><div class="src-desc">DWD · Germany · Global + Europe high-res</div></div>
@@ -600,9 +598,8 @@ body{padding-bottom:64px;}
       <div class="src-item"><div class="src-name" style="color:#dc2626">UKMO</div><div class="src-desc">UK Met Office · Global model</div></div>
       <div class="src-item"><div class="src-name" style="color:#d97706">CMA</div><div class="src-desc">China Met Admin · GRAPES global</div></div>
       <div class="src-item"><div class="src-name" style="color:#6366f1">JMA</div><div class="src-desc">Japan Met Agency · Global 20km</div></div>
-      <div class="src-item"><div class="src-name" style="color:#b45309">BOM</div><div class="src-desc">Bureau of Meteorology · AUS · hourly forecast (~3 days)</div></div>
     </div>
-    <p style="margin-top:10px;font-size:12px">Forecasts via <a href="https://open-meteo.com" target="_blank" style="color:var(--accent)">Open-Meteo</a> + <a href="https://www.bom.gov.au" target="_blank" style="color:var(--accent)">BOM</a>. Past "actual" data and model weighting use BOM's nearest-station observations. BOM data is fetched through a Cloudflare Worker. Refreshes automatically every hour.</p>
+    <p style="margin-top:10px;font-size:12px">Forecasts via <a href="https://open-meteo.com" target="_blank" style="color:var(--accent)">Open-Meteo</a>. Past "actual" data and the Actual source can use <a href="https://www.bom.gov.au" target="_blank" style="color:var(--accent)">BOM</a>'s nearest-station observations (Australia), fetched through a Cloudflare Worker — BOM is used for observations only, not forecasts. Refreshes automatically every hour.</p>
 
     <h3>Menu (☰)</h3>
     <p><strong>Show:</strong> which metrics appear (Temp / Rain / Wind / Cloud). <strong>Options:</strong> Weighted blend, Vertical table, Actual rows, Predicted line, Confidence chip, Debug. <strong>Models:</strong> enable/disable individual sources — disabled models leave the blend. Any change recalculates everything.</p>
@@ -716,8 +713,7 @@ const MODELS = [
   { key:'gem_seamless',      ep:'/v1/forecast', label:'GEM',   short:'C', color:'#7c3aed', desc:'Env. Canada'     },
   { key:'ukmo_seamless',     ep:'/v1/forecast', label:'UKMO',  short:'U', color:'#dc2626', desc:'Met Office · UK' },
   { key:'cma_grapes_global', ep:'/v1/forecast', label:'CMA',   short:'X', color:'#d97706', desc:'CMA · China'     },
-  { key:'jma_seamless',      ep:'/v1/forecast', label:'JMA',   short:'J', color:'#6366f1', desc:'JMA · Japan'     },
-  { key:'bom_forecast',      ep:'bomfc',        label:'BOM',   short:'B', color:'#b45309', desc:'BOM · AUS (hourly)', bomFc:true }
+  { key:'jma_seamless',      ep:'/v1/forecast', label:'JMA',   short:'J', color:'#6366f1', desc:'JMA · Japan'     }
 ];
 
 const enabled    = new Set(MODELS.map(m=>m.key));
@@ -1256,7 +1252,6 @@ async function fetchAllModels(){
 
   locationOffsetSec=null;
   const omModels=MODELS.filter(m=>!m.bomFc);
-  const bomFcModels=MODELS.filter(m=>m.bomFc);
 
   await Promise.all(omModels.map(async m=>{
     try{
@@ -1282,9 +1277,6 @@ async function fetchAllModels(){
 
   // Fallback offset (browser tz) if no Open-Meteo model succeeded
   if(locationOffsetSec==null)locationOffsetSec=-new Date().getTimezoneOffset()*60;
-
-  // BOM forecast model — fetched via the Worker, aligned to the location's local time
-  await Promise.all(bomFcModels.map(m=>fetchBomForecast(m)));
 
   MODELS.forEach(m=>{
     const el=document.getElementById('toggle-'+m.key);if(!el)return;
@@ -1512,8 +1504,9 @@ function computeDaySummary(dateStr){
           aTHi,aTLo,aWHi,aWLo,aCHi,aCLo,aHasT,aHasW,aHasC};
 }
 
-const _ccBox=(cls,title,color,body,conf)=>
-  `<div class="cc-box ${cls}">${(conf!=null&&showConfidence)?`<div class="cc-conf-badge" style="color:${confColor(conf)}" title="${confLabel(conf)} model agreement">${conf}%</div>`:''}<div class="cc-title" style="color:${color}">${title}</div>${body}</div>`;
+const _ccBox=(cls,title,color,body)=>
+  `<div class="cc-box ${cls}"><div class="cc-title" style="color:${color}">${title}</div>${body}</div>`;
+function _confInline(dateStr,key){ if(!showConfidence||!dateStr)return ''; const c=confDayMetric(dateStr,key); return c==null?'':`<span class="cc-mc" style="color:${MET_COLOR[key]}">${c}%</span>`; }
 const _T=(v,suf='°')=>v!=null?tempDisp(v)+suf:'—';
 
 // Today page — live "current" values
@@ -1537,19 +1530,19 @@ function buildTodayBoxes(){
     temp, feels, hi, lo, rain:rainToday, restOfDay:comp?.rainRemainToday, actualRain, wind, dir, cloud, code:wcode, night});
   const dot=on=>on?'<span class="obs-dot" title="BOM observation">●</span>':'';
   const _cdt=localTodayStr();
-  const t=_ccBox('cc-temp','Temp','#86efac',`<div class="cc-main">${_T(temp)}${dot(comp?.obsTemp)}</div><div class="cc-sub">Feels ${_T(feels)}</div><div class="cc-sub">↑ ${_T(hi)}　↓ ${_T(lo)}</div>`,confDayMetric(_cdt,'temp'));
+  const t=_ccBox('cc-temp','Temp','#86efac',`<div class="cc-main">${_T(temp)}${dot(comp?.obsTemp)}${_confInline(_cdt,'temp')}</div><div class="cc-sub">Feels ${_T(feels)}</div><div class="cc-sub">↑ ${_T(hi)}　↓ ${_T(lo)}</div>`);
   const rainRemain=comp?.rainRemainToday??Math.max(0,rainToday-(actualRain||0));
   let rainBody;
   if(actualRain!=null){
     const totDisp=(actualRain+(rainRemain||0)).toFixed(1), aDisp=actualRain.toFixed(1);
     const restDisp=Math.max(0,parseFloat(totDisp)-parseFloat(aDisp)).toFixed(1);  // forced so A+Rest=Total
-    rainBody=`<div class="cc-main">${totDisp} mm</div><div class="cc-sub">Actual ${aDisp} mm</div><div class="cc-sub">Rest of day ${restDisp} mm</div>`;
+    rainBody=`<div class="cc-main">${totDisp} mm${_confInline(_cdt,'rain')}</div><div class="cc-sub">Actual ${aDisp} mm</div><div class="cc-sub">Rest of day ${restDisp} mm</div>`;
   }else{
-    rainBody=`<div class="cc-main">${rainToday.toFixed(1)} mm</div><div class="cc-sub">Day total</div><div class="cc-sub">${rainToday<0.2?'Dry day expected':'Expected today'}</div>`;
+    rainBody=`<div class="cc-main">${rainToday.toFixed(1)} mm${_confInline(_cdt,'rain')}</div><div class="cc-sub">Day total</div><div class="cc-sub">${rainToday<0.2?'Dry day expected':'Expected today'}</div>`;
   }
-  const r=_ccBox('','Rain','#90caf9',rainBody,confDayMetric(_cdt,'rain'));
-  const w=_ccBox('','Wind','#d9f99d',`<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}${dot(comp?.obsWind)}</div><div class="cc-sub">${arrow} ${dir}</div><div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`,confDayMetric(_cdt,'wind'));
-  const cl=_ccBox('','Cloud','#c4b5fd',`<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}${dot(comp?.obsCloud)}</div><div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div><div class="cc-sub">${cloudSynopsis(cloud)}</div>`,confDayMetric(_cdt,'cloud'));
+  const r=_ccBox('','Rain','#90caf9',rainBody);
+  const w=_ccBox('','Wind','#d9f99d',`<div class="cc-main">${wind!=null?Math.round(wind)+' km/h':'—'}${dot(comp?.obsWind)}${_confInline(_cdt,'wind')}</div><div class="cc-sub">${arrow} ${dir}</div><div class="cc-sub">↑ ${windHi!=null?Math.round(windHi):'—'}　↓ ${windLo!=null?Math.round(windLo):'—'} km/h</div>`);
+  const cl=_ccBox('','Cloud','#c4b5fd',`<div class="cc-main">${cloud!=null?Math.round(cloud)+'%':'—'}${dot(comp?.obsCloud)}${_confInline(_cdt,'cloud')}</div><div class="cc-sub">↑ ${cloudHi!=null?Math.round(cloudHi):'—'}%　↓ ${cloudLo!=null?Math.round(cloudLo):'—'}%</div><div class="cc-sub">${cloudSynopsis(cloud)}</div>`);
   return cond+(secVisible.temp?t:'')+(secVisible.rain?r:'')+(secVisible.wind?w:'')+(secVisible.cloud?cl:'');
 }
 
@@ -1574,36 +1567,36 @@ function buildDayBoxes(dateStr){
   const tBody = past
     ? `<div class="cc-main">${HL2(tActual?s.aTHi:s.hi, tActual?s.aTLo:s.lo,'°')}</div>`+
       `<div class="cc-sub">${tActual?'Forecast '+HL2(s.hi,s.lo,'°'):tempDaySynopsis(s.hi,s.lo)}</div>`
-    : `<div class="cc-main">${HL2(s.hi,s.lo,'°')}</div>`+
+    : `<div class="cc-main">${HL2(s.hi,s.lo,'°')}${_confInline(dateStr,'temp')}</div>`+
       `<div class="cc-sub">${tempDaySynopsis(s.hi,s.lo)}</div>`;
-  const t=_ccBox('cc-temp','Temp','#86efac',tBody,past?null:confDayMetric(dateStr,'temp'));
+  const t=_ccBox('cc-temp','Temp','#86efac',tBody);
 
   // RAIN
   const rActual = past && s.actualRain!=null;
   const rBody = past
     ? `<div class="cc-main">${(rActual?s.actualRain:s.rain).toFixed(1)} mm</div>`+
       `<div class="cc-sub">${rActual?'Forecast '+s.rain.toFixed(1)+' mm':rainSynopsis(s.rain,null)}</div>`
-    : `<div class="cc-main">${s.rain.toFixed(1)} mm</div>`+
+    : `<div class="cc-main">${s.rain.toFixed(1)} mm${_confInline(dateStr,'rain')}</div>`+
       `<div class="cc-sub">${rainSynopsis(s.rain,null)}</div>`;
-  const r=_ccBox('','Rain','#90caf9',rBody,past?null:confDayMetric(dateStr,'rain'));
+  const r=_ccBox('','Rain','#90caf9',rBody);
 
   // WIND
   const wActual = past && s.aHasW;
   const wBody = past
     ? `<div class="cc-main">${HL2(wActual?s.aWHi:s.windHi, wActual?s.aWLo:s.windLo,'')}<span class="cc-unit">km/h</span></div>`+
       `<div class="cc-sub">${wActual?'Forecast '+HL2(s.windHi,s.windLo,'')+' km/h':(dir?dir+' · ':'')+windWord(s.windHi||0)}</div>`
-    : `<div class="cc-main">${HL2(s.windHi,s.windLo,'')}<span class="cc-unit">km/h</span></div>`+
+    : `<div class="cc-main">${HL2(s.windHi,s.windLo,'')}<span class="cc-unit">km/h</span>${_confInline(dateStr,'wind')}</div>`+
       `<div class="cc-sub">${(arrow?arrow+' ':'')}${dir||'—'} · ${windWord(s.windHi||0)}</div>`;
-  const w=_ccBox('','Wind','#d9f99d',wBody,past?null:confDayMetric(dateStr,'wind'));
+  const w=_ccBox('','Wind','#d9f99d',wBody);
 
   // CLOUD
   const cActual = past && s.aHasC;
   const cBody = past
     ? `<div class="cc-main">${HL2(cActual?s.aCHi:s.cloudHi, cActual?s.aCLo:s.cloudLo,'%')}</div>`+
       `<div class="cc-sub">${cActual?'Forecast '+HL2(s.cloudHi,s.cloudLo,'%'):cloudSynopsis(s.cloudMean)}</div>`
-    : `<div class="cc-main">${HL2(s.cloudHi,s.cloudLo,'%')}</div>`+
+    : `<div class="cc-main">${HL2(s.cloudHi,s.cloudLo,'%')}${_confInline(dateStr,'cloud')}</div>`+
       `<div class="cc-sub">${cloudSynopsis(s.cloudMean)}</div>`;
-  const cl=_ccBox('','Cloud','#c4b5fd',cBody,past?null:confDayMetric(dateStr,'cloud'));
+  const cl=_ccBox('','Cloud','#c4b5fd',cBody);
 
   return cond+(secVisible.temp?t:'')+(secVisible.rain?r:'')+(secVisible.wind?w:'')+(secVisible.cloud?cl:'');
 }
@@ -1629,30 +1622,26 @@ function sceneFromCode(c){
   return 'clear';
 }
 // ── WeatherBlend dynamic glyph ────────────────────────────────────────────
-// A single procedural mark built from the four core metrics rather than picked
-// from a library. Each element scales/fades by the normalised strength of its
-// metric around a white "Blend Core": mint sun = temperature, lime airflow =
-// wind, blue drops = rain, purple cloud = cloud/humidity.
+// Four overlapping circles in the favicon's quatrefoil layout (wind · temp ·
+// rain · cloud). Each circle grows and brightens with its metric's normalised
+// strength — a tiny data dial, sort of a Gann-circle read on the conditions.
 function _clamp01(x){return Math.max(0,Math.min(1,x));}
 function weatherGlyph(temp,rain,wind,cloud){
   const tS=_clamp01((((temp==null)?15:temp)+5)/45);
   const rS=_clamp01(1-Math.exp(-((rain||0))/3));
   const wS=_clamp01((wind||0)/45);
   const cS=_clamp01((cloud||0)/100);
-  const sunScale=(0.55+tS*0.7)*(1-cS*0.6);            // hotter → bigger; cloud dims it
-  const sunOp=(0.25+0.75*(1-cS)).toFixed(2);
-  const cloudScale=(0.62+cS*0.5).toFixed(3);
-  const cloudOp=(0.12+0.88*cS).toFixed(2);
-  const rainOp=rS.toFixed(2);
-  const windOp=(0.1+0.9*wS).toFixed(2);
-  const svg=`<svg class="wb-glyph" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">`+
-    `<g opacity="${cloudOp}" transform="translate(64 80) scale(${cloudScale}) translate(-64 -80)"><g class="wbg-cloud"><path d="M35 82 C35 72 43 66 53 66 C56 57 66 54 74 59 C86 59 94 67 94 77 C94 87 86 94 76 94 H45 C39 94 35 89 35 82Z" fill="#C8A6FF"/></g></g>`+
-    `<g opacity="${sunOp}" transform="translate(64 32) scale(${sunScale.toFixed(3)})"><g class="wbg-sun"><circle r="16" fill="#7EE8A5"/></g></g>`+
-    `<g opacity="${windOp}" class="wbg-wind"><path d="M18 64 C34 64 36 50 54 50 M22 74 C42 74 46 62 62 62" stroke="#A8E63E" stroke-width="6" stroke-linecap="round" fill="none"/></g>`+
-    `<g opacity="${rainOp}" class="wbg-rain"><path class="wbg-drop" d="M88 54 C93 61 93 69 88 76 C83 69 83 61 88 54Z" fill="#5FA4FF"/><path class="wbg-drop wbg-drop2" d="M102 58 C107 65 107 73 102 80 C97 73 97 65 102 58Z" fill="#5FA4FF"/></g>`+
-    `<circle class="wbg-core" cx="64" cy="64" r="10" fill="white"/>`+
+  const R=s=>(7+s*6).toFixed(1);          // radius 7 → 13
+  const O=s=>(0.32+s*0.62).toFixed(2);    // opacity 0.32 → 0.94
+  const svg=`<svg class="wb-orb" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">`+
+    `<g class="wbo">`+
+      `<circle class="wbo-w" cx="20" cy="32" r="${R(wS)}" fill="#A8E63E" opacity="${O(wS)}"/>`+
+      `<circle class="wbo-t" cx="32" cy="20" r="${R(tS)}" fill="#7EE8A5" opacity="${O(tS)}"/>`+
+      `<circle class="wbo-r" cx="44" cy="32" r="${R(rS)}" fill="#5FA4FF" opacity="${O(rS)}"/>`+
+      `<circle class="wbo-c" cx="32" cy="44" r="${R(cS)}" fill="#C8A6FF" opacity="${O(cS)}"/>`+
+    `</g>`+
   `</svg>`;
-  return `<div class="cc-now-icon cc-blend-glyph">${svg}</div>`;
+  return `<div class="cc-now-icon cc-orb-glyph">${svg}</div>`;
 }
 function nowNarrative(o){
   const t=o.temp;
@@ -1887,6 +1876,7 @@ document.addEventListener('pointerdown',_scrubStart);
 // hour and per day; an overall figure weights temp & rain most. It measures
 // agreement, NOT a guarantee of accuracy. Day figures ease down with lead time.
 const CONF_FIELDS={temp:['temperature_2m',6,0.38],rain:['precipitation',4,0.30],wind:['windspeed_10m',16,0.15],cloud:['cloudcover',38,0.17]};
+const MET_COLOR={temp:'#86efac',rain:'#90caf9',wind:'#d9f99d',cloud:'#c4b5fd'};   // confidence text matches its metric
 function confColor(p){return p==null?'var(--text-dim)':p>=72?'#34d399':p>=48?'#fbbf24':'#fb7185';}
 function confLabel(p){return p>=72?'High':p>=48?'Medium':'Low';}
 function _spreadConf(vals,scale){
@@ -1948,21 +1938,20 @@ function condCard(o){
   const wHi=(past&&o.aHasW)?o.aWHi:o.windHi, wLo=(past&&o.aHasW)?o.aWLo:o.windLo;
   const cHi=(past&&o.aHasC)?o.aCHi:o.cloudHi, cLo=(past&&o.aHasC)?o.aCLo:o.cloudLo;
   const sideRows=[];
+  const _confSub=(key,col)=>{ if(!showConfidence||!o.dateStr)return ''; const c=confDayMetric(o.dateStr,key); return c==null?'':`<div class="cc-now-confsub" style="color:${col}">${c}% confidence</div>`; };
   if(secVisible.rain){
-    let rc='';
-    if(o.dateStr){ const c=confDayMetric(o.dateStr,'rain'); if(c!=null&&showConfidence) rc=`<div class="cc-now-confsub" style="color:${confColor(c)}">${c}% confidence</div>`; }
-    sideRows.push(`<div class="cc-now-sub cc-now-rainfig" style="color:#60a5fa"><span class="cns-i">${MI_RAIN}</span>${rainV!=null?rainV.toFixed(1)+' mm':'—'}</div>${rc}`);
+    sideRows.push(`<div class="cc-now-sub cc-now-rainfig" style="color:#60a5fa"><span class="cns-i">${MI_RAIN}</span>${rainV!=null?rainV.toFixed(1)+' mm':'—'}</div>${_confSub('rain','#60a5fa')}`);
   }
   if(secVisible.wind){
     const w=isT?`${o.wind!=null?Math.round(o.wind)+' km/h':'—'}${o.dir?' '+o.dir:''}`:`${HLs(wHi,wLo,'')}<span class="cns-u"> km/h</span>`;
-    sideRows.push(`<div class="cc-now-sub" style="color:#a3e635"><span class="cns-i">${MI_WIND}</span>${w}</div>`);
+    sideRows.push(`<div class="cc-now-sub" style="color:#a3e635"><span class="cns-i">${MI_WIND}</span>${w}</div>${_confSub('wind','#a3e635')}`);
   }
   if(secVisible.cloud){
     const c=isT?`${o.cloud!=null?Math.round(o.cloud)+'%':'—'}`:`${HLs(cHi,cLo,'%')}`;
-    sideRows.push(`<div class="cc-now-sub" style="color:#c4b5fd"><span class="cns-i">${MI_CLOUD}</span>${c}</div>`);
+    sideRows.push(`<div class="cc-now-sub" style="color:#c4b5fd"><span class="cns-i">${MI_CLOUD}</span>${c}</div>${_confSub('cloud','#c4b5fd')}`);
   }
   const side=sideRows.length?`<div class="cc-now-side">${sideRows.join('')}</div>`:'';
-  const tempBlock=secVisible.temp?`<div class="cc-now-temp">${big}${sub2?`<div class="cc-now-feels">${sub2}</div>`:''}</div>`:'';
+  const tempBlock=secVisible.temp?`<div class="cc-now-temp">${big}${sub2?`<div class="cc-now-feels">${sub2}</div>`:''}${_confSub('temp','#86efac')}</div>`:'';
   const gT=isT?o.temp:((o.hi!=null&&o.lo!=null)?(o.hi+o.lo)/2:o.hi);
   const gWind=isT?o.wind:o.windHi;
   const gCloud=isT?o.cloud:o.cloud;
@@ -1973,7 +1962,6 @@ function condCard(o){
       ${tempBlock}
       ${side}
     </div>
-    ${o.dateStr?confidenceChipHTML(o.dateStr):''}
     ${o.dateStr?nowChartHTML(o.dateStr):''}
   </div>`;
 }
@@ -2227,19 +2215,17 @@ function buildHourTile(iso){
   const C=d.cloud!=null?Math.round(d.cloud)+'%':'–';
   const now=_nowHourIso(hourBarStep())===iso;
   const _ci=refHourly()?.time?.indexOf(iso);
-  const _hc=showConfidence&&_ci!=null&&_ci>=0?confHourOverall(_ci):null;
-  const confTag=_hc!=null?`<div class="hb-conf" style="color:${confColor(_hc)}" title="Model agreement"><span class="hb-conf-dot" style="background:${confColor(_hc)}"></span>${_hc}%</div>`:'';
+  const cf=(key)=>{ if(!showConfidence||_ci==null||_ci<0)return ''; const c=confHourMetric(_ci,key); return c==null?'':`<span class="hb-mc">${c}%</span>`; };
   const rows=[
-    secVisible.temp?`<div class="hb-m hb-t">${MI_TEMP}<span>${T}</span></div>`:'',
-    secVisible.rain?`<div class="hb-m hb-r">${MI_RAIN}<span>${R}</span></div>`:'',
-    secVisible.wind?`<div class="hb-m hb-w">${MI_WIND}<span>${W}</span></div>`:'',
-    secVisible.cloud?`<div class="hb-m hb-c">${MI_CLOUD}<span>${C}</span></div>`:''
+    secVisible.temp?`<div class="hb-m hb-t">${MI_TEMP}<span>${T}</span>${cf('temp')}</div>`:'',
+    secVisible.rain?`<div class="hb-m hb-r">${MI_RAIN}<span>${R}</span>${cf('rain')}</div>`:'',
+    secVisible.wind?`<div class="hb-m hb-w">${MI_WIND}<span>${W}</span>${cf('wind')}</div>`:'',
+    secVisible.cloud?`<div class="hb-m hb-c">${MI_CLOUD}<span>${C}</span>${cf('cloud')}</div>`:''
   ].join('');
   return `<div class="hb-tile${d.past?' hb-past':''}${d.isAct?' hb-act':''}${now?' hb-now':''}" data-iso="${iso}">
     <div class="hb-hour">${hr}</div>
     <div class="hb-wx">${wxIcon(d.code,d.night,d.phase)}</div>
     <div class="hb-rows">${rows}</div>
-    ${confTag}
   </div>`;
 }
 
@@ -2509,69 +2495,6 @@ function alignToGrid(src, refData){
   return out;
 }
 
-// BOM's API is future-only. We archive each issue's hourly forecast to D1 (via
-// /track/sync) and back-fill past hours from D1 (via /track/bomhourly), so the
-// BOM row shows what BOM forecast for past hours. 21-day retention server-side.
-let _bomFreshHourly=null;     // this load's freshly-fetched BOM hourly (for the D1 POST)
-function bomHourlyForSync(){
-  const h=_bomFreshHourly; if(!h||!h.time) return [];
-  const out=[];
-  h.time.forEach((t,i)=>{
-    const temp=h.temperature_2m?.[i];
-    if(temp==null && h.precipitation?.[i]==null && h.windspeed_10m?.[i]==null) return;
-    out.push({ts:t, temp, rain:h.precipitation?.[i], wind:h.windspeed_10m?.[i], dir:h.winddirection_10m?.[i], wc:h.weathercode?.[i]});
-  });
-  return out;
-}
-async function backfillBomHourlyFromD1(){
-  try{
-    const station=actualData?._bom?.wmo; const bf=state.data['bom_forecast'];
-    if(!station||!bf?.hourly||!bomWorkerConfigured())return;
-    const r=await fetch(`${BOM_WORKER_URL}/track/bomhourly?station=${encodeURIComponent(station)}`,{signal:AbortSignal.timeout(15000)});
-    if(!r.ok)return; const j=await r.json(); const rows=(j&&j.rows)||[];
-    if(!rows.length){ dbg('BOM hourly D1: no stored rows yet'); return; }
-    const map={}; rows.forEach(x=>map[x.ts]=x);
-    const H=bf.hourly; let filled=0;
-    H.time.forEach((t,i)=>{
-      if(H.temperature_2m[i]==null && map[t]){
-        const c=map[t];
-        if(c.temp!=null){H.temperature_2m[i]=c.temp;filled++;}
-        if(c.rain!=null)H.precipitation[i]=c.rain;
-        if(c.wind!=null)H.windspeed_10m[i]=c.wind;
-        if(c.dir!=null&&H.winddirection_10m)H.winddirection_10m[i]=c.dir;
-        if(c.wc!=null&&H.weathercode)H.weathercode[i]=c.wc;
-      }
-    });
-    dbg(`BOM hourly D1: back-filled ${filled} past hrs from ${rows.length} stored`);
-  }catch(e){ dbg('BOM hourly D1 back-fill failed: '+(e.message||e.name)); }
-}
-async function fetchBomForecast(m){
-  state.status[m.key]='load'; updatePills();
-  try{
-    if(!bomWorkerConfigured())throw new Error('Worker URL not set');
-    if(state.lat==null||state.lon==null)throw new Error('no coordinates');
-    const name=((document.getElementById('loc-name').textContent||'').split(',')[0]||'').trim();
-    if(!name)throw new Error('no location name to search');
-    const u=`${BOM_WORKER_URL}?forecast=1&search=${encodeURIComponent(name)}&lat=${state.lat}&lon=${state.lon}`;
-    dbg(`BOM forecast: searching "${name}" via Worker`);
-    const r=await fetch(u,{signal:AbortSignal.timeout(15000)});
-    if(!r.ok){ let why=''; try{const j=await r.json(); why=j.error?(' ('+j.error+')'):'';}catch{} throw new Error('worker HTTP '+r.status+why); }
-    const j=await r.json();
-    let parsed=parseBomForecast(j.data, locationOffsetSec);
-    if(!parsed||!parsed.hourly.time.length)throw new Error('no forecast data');
-    _bomFreshHourly={time:[...parsed.hourly.time],temperature_2m:[...parsed.hourly.temperature_2m],precipitation:[...parsed.hourly.precipitation],windspeed_10m:[...parsed.hourly.windspeed_10m],winddirection_10m:[...parsed.hourly.winddirection_10m],weathercode:[...parsed.hourly.weathercode]};
-    const refModel=MODELS.find(mm=>!mm.bomFc && state.data[mm.key]);
-    const bomStart=parsed.hourly.time[0];
-    if(refModel)parsed=alignToGrid(parsed, state.data[refModel.key]);   // past hours back-filled later from D1
-    state.data[m.key]=parsed; state.status[m.key]='ok';
-    dbg(`BOM forecast: ✓ ${j.location?.name||name} (${j.geohash||'?'}) — starts ${bomStart}`);
-  }catch(e){
-    dbg('❌ BOM forecast failed: '+(e.message||e.name));
-    state.status[m.key]='fail'; autoHidden.add(m.key);
-  }
-  updatePills();
-}
-
 // Parse BOM stations.txt (fixed-width) -> [{wmo, state, lat, lon, name}]
 let bomStationsCache=null;
 async function loadBomStations(){
@@ -2761,10 +2684,6 @@ async function fetchActualsAndComputeWeights(){
     if(bom) dbg('actuals: BOM '+(bom.stationName||'')+' + Open-Meteo · source='+actualSource);
     else dbg('actuals: Open-Meteo past (no BOM) · source='+actualSource);
 
-    // 2b) Back-fill the BOM forecast row's PAST hours from D1 (BOM's API is
-    //     future-only). Must happen before weights so BOM earns real history.
-    await backfillBomHourlyFromD1();
-
     // 3) Per-metric weights via the active method, scored against the selected source.
     applyWeights();
   }catch(e){
@@ -2828,17 +2747,14 @@ async function syncAndLoadAccuracy(){
   const dates=carouselDates().filter(d=>d>=today).slice(0,8);   // today + next 7
   // Only BOM's published forecast is archived server-side now — the 7 global
   // models' past forecasts are pulled on demand from the Previous Runs API.
-  const forecasts=[];
-  if(state.data['bom_forecast']){ dates.forEach(d=>{const a=modelDay('bom_forecast',d); if(a)forecasts.push({target:d,model:'bom_forecast',...a});}); }
   const actuals=bomDailyActuals();
-  const bomHourly=bomHourlyForSync();
   const b=actualData?._bom||{};
   const meta={lat:b.lat??state.lat, lon:b.lon??state.lon, state:b.state||'', name:b.stationName||''};
 
   try{
     await fetch(`${BOM_WORKER_URL}/track/sync`,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({station,issued:today,forecasts,actuals,bomHourly,meta})});
-    dbg(`accuracy: synced ${forecasts.length} BOM-forecast rows, ${actuals.length} actuals, ${bomHourly.length} BOM hourly`);
+      body:JSON.stringify({station,issued:today,actuals,meta})});
+    dbg(`accuracy: synced ${actuals.length} actuals`);
   }catch(e){ dbg('accuracy sync POST failed: '+e.message); }
 
   try{
@@ -3826,9 +3742,9 @@ function renderHourly(){
     const c=showConfidence?confHourMetric(i,key):null; const nc=ci===nowCi?'now-col':'';
     const txt=c==null?'<span class="empty">–</span>':c+'%';
     const op=c==null?0.5:(0.4+c/100*0.6);
-    return injectColCls(`<td class="${nc}" style="color:${confColor(c)};opacity:${op.toFixed(2)};font-weight:600">${txt}</td>`,ndCls[ci]);
+    return injectColCls(`<td class="${nc}" style="color:${MET_COLOR[key]};opacity:${op.toFixed(2)};font-weight:600">${txt}</td>`,ndCls[ci]);
   }).join('');
-  const confRow=(key)=> showConfidence?`<tr class="data-row conf-row"><td class="row-label" style="font-size:12px;color:var(--text-dim)">Confidence</td>${confCellsFor(key)}</tr>`:'';
+  const confRow=(key)=> showConfidence?`<tr class="data-row conf-row"><td class="row-label" style="font-size:12px;color:${MET_COLOR[key]};opacity:.85">Confidence</td>${confCellsFor(key)}</tr>`:'';
 
   const iconKey=onlyEnabled[0]?.key||allActive[0]?.key;
   // Blend cloud & precip per column once, then derive the icon from them so the
