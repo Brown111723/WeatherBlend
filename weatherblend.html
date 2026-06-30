@@ -58,12 +58,16 @@ header{padding:10px 15px;border-bottom:1px solid var(--border);display:flex;alig
 .drawer-item{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text-primary);font-size:14.5px;font-weight:500;cursor:pointer;text-align:left;}
 .drawer-item:hover{border-color:var(--accent);background:rgba(96,165,250,.08);}
 .drawer-item svg{color:var(--text-muted);flex-shrink:0;}
-/* Sticky date bar */
-.datebar{position:relative;display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--border);}
-.date-nav{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:none;border:none;color:var(--text-dim);cursor:pointer;transition:color .15s,background .15s,transform .1s;}
-.date-nav:hover{color:var(--text-primary);background:var(--border);}
-.date-nav:active{transform:scale(.88);}
-.cur-date{cursor:pointer;}
+/* Date header on the now card */
+.cc-datehead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-2px 0 13px;}
+.cdh-nav{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:none;border:none;color:var(--text-dim);cursor:pointer;flex-shrink:0;transition:color .15s,background .15s,transform .1s;}
+.cdh-nav:hover{color:var(--text-primary);background:rgba(255,255,255,.06);}
+.cdh-nav:active{transform:scale(.86);}
+.cdh-when{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;flex:1;min-width:0;line-height:1;}
+.cdh-rel{font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:2.5px 12px;border-radius:999px;background:rgba(96,165,250,.15);color:#93c5fd;}
+.cdh-date{font-size:18px;font-weight:600;letter-spacing:.2px;color:var(--text-primary);white-space:nowrap;}
+.cc-now.not-today .cdh-rel{background:rgba(251,191,36,.16);color:#fbbf24;}
+.cc-now.not-today .cdh-date{color:#fde68a;}
 .hdr-right{display:flex;align-items:center;gap:8px;}
 
 /* ── Current conditions: swipeable day carousel ── */
@@ -490,13 +494,6 @@ body{padding-bottom:64px;}
 </div>
 
 <div class="model-panel" id="model-panel"></div>
-
-<!-- Sticky date bar with day navigation -->
-<div class="datebar" id="datebar">
-  <button class="date-nav" onclick="stepDay(-1)" aria-label="Previous day"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"/></svg></button>
-  <div class="cur-date" id="curr-date" onclick="goToToday()" title="Jump to today">–</div>
-  <button class="date-nav" onclick="stepDay(1)" aria-label="Next day"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"/></svg></button>
-</div>
 </div><!-- /topbar -->
 
 <!-- Carousels section (day overview + hourly strip) -->
@@ -603,7 +600,7 @@ body{padding-bottom:64px;}
 
     <h3>Accuracy &amp; weighting</h3>
     <p>Models are blended by how accurate they've recently been, scored against real observations. <strong>Actual source</strong> sets the ground truth: <em>BOM</em> (station obs), <em>Open-Meteo</em> (re-analysis) or <em>Blend</em>. <strong>Weight method</strong>:</p>
-    <p><strong>Recency</strong> — recency-weighted error over a learning window (plus server-learned weights for BOM).<br>
+    <p><strong>Recency</strong> — recency-weighted error over a learning window (plus server-learned weights from verified history when BOM is the actual source).<br>
     <strong>Per-day</strong> — scores each model's error per day over the last X days (1–7), then averages those days.<br>
     <strong>Blend</strong> — the mean of the two.</p>
     <p>A model needs a little history before it can be scored; until then it gets a neutral (median) weight.</p>
@@ -612,7 +609,7 @@ body{padding-bottom:64px;}
     <p>Confidence is a plain-English read on <em>how much the models agree</em>. When they all predict much the same thing it's <strong style="color:#34d399">High</strong>; when they diverge it falls to <strong style="color:#fbbf24">Medium</strong> or <strong style="color:#fb7185">Low</strong>. It's computed <strong>per metric, per hour and per day</strong>, in each metric's colour: a % shows next to the hourly card values, on each metric card's main figure, under the now card's figures, and as a <strong>Confidence</strong> row in each table section. Pick which metrics show it under ☰ → Confidence (Rain is on by default). Day figures ease down for days further ahead. It measures <em>agreement, not certainty</em> — high means the models are consistent, not that they're guaranteed right.</p>
 
     <h3>The forecast glyph</h3>
-    <p>Instead of fixed weather icons, the now card draws one living mark built from the data itself: a mint sun (temperature), lime airflow (wind), blue drops (rain) and a purple cloud (cloud cover), each growing or fading with its value around a white blend core. Every forecast gets its own visual fingerprint.</p>
+    <p>Instead of fixed weather icons, the now card draws one living mark built from the data itself: four circles — mint (temperature), lime (wind), blue (rain) and purple (cloud) — each growing and brightening with its value, with the strongest metric glowing. Temp and wind scale to the local high/low, cloud is a plain 0–100%, and rain uses a log scale; quiet metrics (no rain, light wind, clear skies) simply fade away. Every forecast gets its own visual fingerprint.</p>
 
     <h3>Location</h3>
     <p>Tap 📍 to search any city (GPS first, IP fallback). Viewing a place in another timezone opens the cards and hourly strip on <em>that</em> location's current time.</p>
@@ -640,7 +637,7 @@ body{padding-bottom:64px;}
 </div>
 <div class="source-note">
   Data: <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> ·
-  GFS (NOAA/USA) · ECMWF IFS 0.25° · ICON (DWD/Germany) · GEM (Canada) · UKMO (Met Office) · CMA (China) · JMA (Japan) · BOM (AUS, forecast + observations) ·
+  GFS (NOAA/USA) · ECMWF IFS 0.25° · ICON (DWD/Germany) · GEM (Canada) · UKMO (Met Office) · CMA (China) · JMA (Japan). Observations: BOM (AUS) ·
   No API key required. Auto-refreshes hourly.
 </div>
 </div>
@@ -700,8 +697,8 @@ window.addEventListener('DOMContentLoaded', ()=>{ dbg('page loaded — debug log
 dbg('script started');
 
 // ══════════════════════════════════════════
-// MODELS — Open-Meteo forecast models + BOM forecast (via Worker).
-// BOM observations are used separately as the "actual" source.
+// MODELS — the seven Open-Meteo global forecast models.
+// BOM is used separately as the "actual" (observations) source, never a forecast.
 // ══════════════════════════════════════════
 const MODELS = [
   { key:'gfs_seamless',      ep:'/v1/forecast', label:'GFS',   short:'G', color:'#2563eb', desc:'NOAA · USA'      },
@@ -1662,14 +1659,18 @@ function weatherGlyph(temp,rain,wind,cloud){
   const tS=nm(temp,rg.tlo,rg.thi), wS=nm(wind,rg.wlo,rg.whi);
   const rS=_clamp01(Math.log1p(Math.max(0,rain||0))/Math.log1p(rg.rmax));
   const cS=_clamp01((cloud||0)/100);
+  // Below these floors a metric isn't worth showing — its circle disappears.
+  const vis={temp:true, rain:(rain||0)>=0.05, wind:(wind||0)>=10, cloud:(cloud||0)>=10};
   const str={temp:tS,rain:rS,wind:wS,cloud:cS};
-  let strong=null,sv=0.6; Object.keys(str).forEach(k=>{ if(str[k]>sv){sv=str[k];strong=k;} });
+  let strong=null,sv=0.6; Object.keys(str).forEach(k=>{ if(vis[k]&&str[k]>sv){sv=str[k];strong=k;} });
   const R=s=>(7+s*6).toFixed(1), O=s=>(0.34+s*0.6).toFixed(2);
   const COL={temp:'#7EE8A5',rain:'#5FA4FF',wind:'#A8E63E',cloud:'#C8A6FF'};
   const POS={temp:[32,20],rain:[44,32],wind:[20,32],cloud:[32,44]};
   const DLY={temp:0,rain:.55,wind:1.1,cloud:1.65};
   const glow=k=> strong===k?`filter:drop-shadow(0 0 3px ${COL[k]});`:'';
-  const C=k=>`<circle class="wbc" style="animation-delay:${DLY[k]}s;${glow(k)}" cx="${POS[k][0]}" cy="${POS[k][1]}" r="${R(str[k])}" fill="${COL[k]}" opacity="${O(str[k])}"/>`;
+  const C=k=> vis[k]
+    ? `<circle class="wbc" style="animation-delay:${DLY[k]}s;${glow(k)}" cx="${POS[k][0]}" cy="${POS[k][1]}" r="${R(str[k])}" fill="${COL[k]}" opacity="${O(str[k])}"/>`
+    : '';
   const svg=`<svg class="wb-orb" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g class="wbo">${C('wind')}${C('temp')}${C('rain')}${C('cloud')}</g></svg>`;
   return `<div class="cc-now-icon cc-orb-glyph">${svg}</div>`;
 }
@@ -1974,7 +1975,24 @@ function condCard(o){
   const gWind=isT?o.wind:o.windHi;
   const gCloud=isT?o.cloud:o.cloud;
   const iconHTML=weatherGlyph(gT, isT?o.rain:o.rain, gWind, gCloud);
-  return `<div class="cc-box cc-cond cc-now">
+  let dateHead='';
+  if(o.dateStr){
+    const _dd=new Date(o.dateStr+'T12:00:00');
+    const _wk=_dd.toLocaleDateString('en-AU',{weekday:'long'});
+    const _mo=_dd.toLocaleDateString('en-AU',{month:'long'});
+    const _rel=relDayLabel(o.dateStr,localTodayStr());
+    const _chev=(d,lbl,pts)=>`<button class="cdh-nav" onclick="stepDay(${d})" aria-label="${lbl}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${pts}"/></svg></button>`;
+    dateHead=`<div class="cc-datehead">
+      ${_chev(-1,'Previous day','15 5 8 12 15 19')}
+      <button class="cdh-when" onclick="goToToday()" title="Jump to today">
+        <span class="cdh-rel">${_rel}</span>
+        <span class="cdh-date">${_wk} ${_dd.getDate()} ${_mo}</span>
+      </button>
+      ${_chev(1,'Next day','9 5 16 12 9 19')}
+    </div>`;
+  }
+  return `<div class="cc-box cc-cond cc-now${isT?'':' not-today'}">
+    ${dateHead}
     <div class="cc-now-main">
       ${iconHTML}
       ${tempBlock}
@@ -4057,6 +4075,10 @@ function renderAccuracyPanel(){
     : `Learning — ${j.days}/${j.matureAt} verified days collected. Using live weighting until mature.`;
   // build rows: per model, RMSE per metric (lower is better); mark best per metric
   const METS=['temp','rain','wind','cloud'];
+  // Only score models that are still forecast sources (drops any legacy BOM-forecast rows).
+  const _modelKeys=new Set(MODELS.map(m=>m.key));
+  j.stats=(j.stats||[]).filter(s=>_modelKeys.has(s.model));
+  if(!j.stats.length){ body.innerHTML='<div class="acc-status none">No verified forecasts yet for this station. Check back after a few days.</div>'; return; }
   const best={}; METS.forEach(m=>{ let bv=Infinity,bk=null; j.stats.forEach(s=>{ if(s[m]!=null&&s[m]<bv){bv=s[m];bk=s.model;} }); best[m]=bk; });
   const wmap=(j&&j.weights)||{};
   const colorOf=k=>(MODELS.find(m=>m.key===k)||{}).color||'#64748b';
